@@ -1,8 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Form, Input, Button, Select, Space, Steps, message } from "antd";
+import { Form, Input, Button, Select, Space, Steps, Flex, message } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import ReactQuill from "react-quill-new";
+import "leaflet/dist/leaflet.css";
+import {
+    MapContainer,
+    TileLayer,
+    Marker,
+    useMapEvents,
+    useMap,
+} from "react-leaflet";
 
 const { Option } = Select;
 const { Step } = Steps;
@@ -39,20 +47,57 @@ const CreateNewTour = () => {
         name: "Hà Nội",
     }); // Trạng thái cho điểm khởi hành
     const navigate = useNavigate(); // Sử dụng useNavigate để điều hướng
+    const [selectedLocation, setSelectedLocation] = useState([
+        {
+            id: 0,
+            latitude: null,
+            longitude: null,
+            address: "",
+        },
+    ]);
 
     const availableLocations = [
-        { id: 1, name: "Vịnh Hạ Long" },
-        { id: 2, name: "Chùa Một Cột" },
-        { id: 3, name: "Núi Fansipan" },
-        { id: 4, name: "Đà Lạt" },
-        { id: 5, name: "Lăng Bác" },
-        { id: 6, name: "Văn Miếu Quốc Tử Giám" },
-        { id: 7, name: "Nhà Tù Hỏa Lò" },
-        { id: 8, name: "Sun*" },
+        {
+            id: 10,
+            name: "Vịnh Hạ Long",
+            latitude: 20.9101,
+            longitude: 107.1839,
+        },
+        {
+            id: 22,
+            name: "Chùa Một Cột",
+            latitude: 21.0285,
+            longitude: 105.8342,
+        },
+        { id: 3, name: "Núi Fansipan", latitude: 22.2587, longitude: 103.8141 },
+        { id: 4, name: "Đà Lạt", latitude: 11.9401, longitude: 108.4583 },
+        { id: 5, name: "Lăng Bác", latitude: 21.0369, longitude: 105.8342 },
+        {
+            id: 6,
+            name: "Văn Miếu Quốc Tử Giám",
+            latitude: 21.0278,
+            longitude: 105.8342,
+        },
+        {
+            id: 7,
+            name: "Nhà Tù Hỏa Lò",
+            latitude: 21.0278,
+            longitude: 105.8552,
+        },
+        { id: 8, name: "Sun*", latitude: 21.0285, longitude: 105.8542 },
     ]; // Danh sách địa điểm có sẵn
 
     const handleAddLocation = () => {
-        setLocations([...locations, { id: locationId, value: null }]);
+        setLocations([
+            ...locations,
+            {
+                id: locationId,
+                value: null,
+                locationId: 0,
+                latitude: null,
+                longitude: null,
+            },
+        ]);
         setLocationId(locationId + 1);
     };
 
@@ -60,10 +105,18 @@ const CreateNewTour = () => {
         setLocations(locations.filter((location) => location.id !== id));
     };
 
-    const handleLocationChange = (id, value) => {
+    const handleLocationChange = (id, value, loc) => {
         setLocations(
             locations.map((location) =>
-                location.id === id ? { ...location, value } : location
+                location.id === id
+                    ? {
+                          ...location,
+                          value,
+                          longitude: loc.longitude,
+                          latitude: loc.latitude,
+                          locationId: loc.id,
+                      }
+                    : location
             )
         );
     };
@@ -97,13 +150,49 @@ const CreateNewTour = () => {
         );
     };
 
+    // const handleMapClick = (e) => {
+    //     const { lat, lng } = e.latlng;
+    //     fetch(
+    //         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+    //     )
+    //         .then((response) => response.json())
+    //         .then((data) => {
+    //             setSelectedLocation({
+    //                 latitude: lat,
+    //                 longitude: lng,
+    //                 address: data.display_name || "Không xác định",
+    //             });
+    //         })
+    //         .catch(() => {
+    //             message.error("Không thể lấy thông tin địa chỉ từ bản đồ.");
+    //         });
+    // };
+
+    // const MapClickHandler = () => {
+    //     useMapEvents({
+    //         click: handleMapClick,
+    //     });
+    //     return null;
+    // };
+
+    // const MapUpdater = () => {
+    //     const map = useMap();
+    //     if (selectedLocation.latitude && selectedLocation.longitude) {
+    //         map.setView(
+    //             [selectedLocation.latitude, selectedLocation.longitude],
+    //             13
+    //         );
+    //     }
+    //     return null;
+    // };
+
     return (
         <div style={{ padding: "24px" }}>
             <h1>Tạo tour mới</h1>
             <Form
                 layout="vertical"
                 onFinish={handleSubmit}
-                style={{ maxWidth: "800px", margin: "0" }}
+                style={{ margin: "0" }}
             >
                 <Form.Item
                     name="name"
@@ -180,99 +269,143 @@ const CreateNewTour = () => {
                         <Input type="number" placeholder="Nhập giá cho em bé" />
                     </Form.Item>
                 </Form.Item>
-                <Form.Item
-                    label={<span style={{ fontWeight: "bold" }}>Lộ trình</span>}
+
+                <Flex
+                    justify="space-between"
+                    gap="16px"
+                    style={{ width: "100%" }}
                 >
-                    <Steps direction="vertical" current={-1}>
-                        {locations.map((location) => (
-                            <Step
-                                key={location.id}
-                                title={`Địa điểm ${location.id}`}
-                                status="process"
-                                description={
-                                    <Space
-                                        style={{
-                                            display: "flex",
-                                            marginBottom: 8,
-                                        }}
-                                        align="baseline"
-                                    >
-                                        <Select
-                                            placeholder="Chọn địa điểm"
-                                            style={{ width: "300px" }}
-                                            value={location.value}
-                                            showSearch // Cho phép tìm kiếm
-                                            filterOption={(input, option) =>
-                                                option.children
-                                                    .toLowerCase()
-                                                    .includes(
-                                                        input.toLowerCase()
-                                                    )
-                                            } // Lọc danh sách dựa trên từ khóa tìm kiếm
-                                            onChange={(value) =>
-                                                handleLocationChange(
-                                                    location.id,
-                                                    value
-                                                )
-                                            }
+                    <Form.Item
+                        label={
+                            <span style={{ fontWeight: "bold" }}>Lộ trình</span>
+                        }
+                    >
+                        <Steps direction="vertical" current={-1}>
+                            {locations.map((location) => (
+                                <Step
+                                    key={location.id}
+                                    title={`Địa điểm ${location.id}`}
+                                    status="process"
+                                    description={
+                                        <Space
+                                            style={{
+                                                display: "flex",
+                                                marginBottom: 8,
+                                            }}
+                                            align="baseline"
                                         >
-                                            {availableLocations
-                                                .filter(
-                                                    (loc) =>
-                                                        !locations.some(
-                                                            (selected) =>
-                                                                selected.value ===
-                                                                loc.name
-                                                        ) ||
-                                                        loc.name ===
-                                                            location.value
-                                                ) // Chỉ hiển thị các địa điểm chưa được chọn hoặc địa điểm hiện tại
-                                                .map((loc) => (
-                                                    <Option
-                                                        key={loc.id}
-                                                        value={loc.name}
-                                                    >
-                                                        {loc.name}
-                                                    </Option>
-                                                ))}
-                                        </Select>
-                                        <Input
-                                            type="number"
-                                            placeholder="Ngày thứ mấy"
-                                            style={{ width: "100px" }}
-                                            onChange={(e) =>
-                                                handleDayChange(
-                                                    location.id,
-                                                    e.target.value
-                                                )
-                                            }
-                                            min={1}
-                                            max={100}
-                                        />
-                                        {locations.length > 1 && (
-                                            <Button
-                                                icon={<DeleteOutlined />}
-                                                danger
-                                                onClick={() =>
-                                                    handleRemoveLocation(
-                                                        location.id
+                                            <Select
+                                                placeholder="Chọn địa điểm"
+                                                style={{ width: "240px" }}
+                                                value={location.value}
+                                                showSearch // Cho phép tìm kiếm
+                                                filterOption={(input, option) =>
+                                                    option.children
+                                                        .toLowerCase()
+                                                        .includes(
+                                                            input.toLowerCase()
+                                                        )
+                                                } // Lọc danh sách dựa trên từ khóa tìm kiếm
+                                                onChange={(value, option) => {
+                                                    handleLocationChange(
+                                                        location.id,
+                                                        value,
+                                                        option.loc
+                                                    );
+                                                }}
+                                            >
+                                                {availableLocations
+                                                    .filter(
+                                                        (loc) =>
+                                                            !locations.some(
+                                                                (selected) =>
+                                                                    selected.value ===
+                                                                    loc.name
+                                                            ) ||
+                                                            loc.name ===
+                                                                location.value
+                                                    ) // Chỉ hiển thị các địa điểm chưa được chọn hoặc địa điểm hiện tại
+                                                    .map((loc) => (
+                                                        <Option
+                                                            key={loc.id}
+                                                            value={loc.name}
+                                                            loc={loc}
+                                                        >
+                                                            {loc.name}
+                                                        </Option>
+                                                    ))}
+                                            </Select>
+                                            <Input
+                                                type="number"
+                                                placeholder="Ngày thứ mấy"
+                                                style={{ width: "100px" }}
+                                                onChange={(e) =>
+                                                    handleDayChange(
+                                                        location.id,
+                                                        e.target.value
                                                     )
                                                 }
-                                            ></Button>
-                                        )}
-                                    </Space>
-                                }
-                            />
-                        ))}
-                    </Steps>
-                    <Button
-                        type="dashed"
-                        onClick={handleAddLocation}
-                        style={{ marginTop: "16px" }}
-                    >
-                        + Thêm địa điểm
-                    </Button>
-                </Form.Item>
+                                                min={1}
+                                                max={100}
+                                            />
+                                            {locations.length > 1 && (
+                                                <Button
+                                                    icon={<DeleteOutlined />}
+                                                    danger
+                                                    onClick={() =>
+                                                        handleRemoveLocation(
+                                                            location.id
+                                                        )
+                                                    }
+                                                ></Button>
+                                            )}
+                                        </Space>
+                                    }
+                                />
+                            ))}
+                        </Steps>
+                        <Button
+                            type="dashed"
+                            onClick={handleAddLocation}
+                            style={{ marginTop: "16px" }}
+                        >
+                            + Thêm địa điểm
+                        </Button>
+                    </Form.Item>
+
+                    <Form.Item style={{ flex: 1 }}>
+                        <div
+                            style={{
+                                height: "400px",
+                                marginBottom: "16px",
+                            }}
+                        >
+                            <MapContainer
+                                center={[21.028511, 105.804817]} // Tọa độ mặc định (Hà Nội)
+                                zoom={13}
+                                style={{ height: "100%", width: "100%" }}
+                            >
+                                <TileLayer
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                />
+                                {locations.map((location) => {
+                                    return (
+                                        location.locationId && (
+                                            <Marker
+                                                key={location.id}
+                                                position={[
+                                                    location.latitude,
+                                                    location.longitude,
+                                                ]}
+                                            />
+                                        )
+                                    );
+                                })}
+                            </MapContainer>
+                        </div>
+                    </Form.Item>
+                </Flex>
 
                 {/* Chọn điểm khởi hành */}
                 <Form.Item

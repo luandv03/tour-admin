@@ -10,6 +10,10 @@ import TourManagement from "./pages/TourManagement.page";
 import TourBookingManagement from "./pages/TourBookingManagement.page";
 import TouristPlaceDetail from "./pages/TouristPlaceDetail.page";
 import TourDetail from "./pages/TourDetail.page";
+import TourBookingDetail from "./pages/TourBookingDetail.page";
+import TourBookingRequestDetail from "./pages/TourBookingRequestDetail.page";
+import CustomerManagement from "./pages/CustomerManagement.page";
+import CustomerDetail from "./pages/CustomerDetail.page";
 
 function App() {
     return (
@@ -41,7 +45,18 @@ function App() {
                         element={<TourBookingManagement />}
                     />
 
+                    <Route
+                        path="/tour-booking/:tourBookingId"
+                        element={<TourBookingRequestDetail />}
+                    />
+
                     <Route path="/tours/create" element={<CreateNewTour />} />
+
+                    <Route path="/customers" element={<CustomerManagement />} />
+                    <Route
+                        path="/customers/:customerId"
+                        element={<CustomerDetail />}
+                    />
                 </Route>
             </Routes>
         </>

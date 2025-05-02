@@ -1,12 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Space, Button, Input, Select, Row, Col } from "antd";
-import {
-    EyeOutlined,
-    EditOutlined,
-    DeleteOutlined,
-    PlusOutlined,
-} from "@ant-design/icons";
+import { EyeOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 
@@ -71,11 +66,6 @@ const TourManagement = () => {
                     />
                     <Button
                         type="link"
-                        icon={<EditOutlined />}
-                        onClick={() => handleEdit(record)}
-                    />
-                    <Button
-                        type="link"
                         danger
                         icon={<DeleteOutlined />}
                         onClick={() => handleDelete(record)}
@@ -84,14 +74,6 @@ const TourManagement = () => {
             ),
         },
     ];
-
-    const handleView = (record) => {
-        console.log("View tour:", record);
-    };
-
-    const handleEdit = (record) => {
-        console.log("Edit tour:", record);
-    };
 
     const handleDelete = (record) => {
         console.log("Delete tour:", record);

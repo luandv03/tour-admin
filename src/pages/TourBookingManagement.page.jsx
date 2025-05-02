@@ -95,13 +95,9 @@ const TourBookingManagement = () => {
                     <Button
                         type="link"
                         icon={<EyeOutlined />}
-                        onClick={() => handleView(record)}
+                        onClick={() => navigate(`/tour-booking/${record.id}`)}
                     />
-                    <Button
-                        type="link"
-                        icon={<EditOutlined />}
-                        onClick={() => handleEdit(record)}
-                    />
+
                     <Button
                         type="link"
                         danger
