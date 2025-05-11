@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Form,
     Input,
@@ -8,53 +8,100 @@ import {
     Steps,
     Typography,
     message,
+    Spin,
+    Rate,
 } from "antd";
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import { useParams } from "react-router-dom";
+import {
+    fetchTourById,
+    fetchCities,
+    fetchTouristPlaces,
+} from "../services/api";
 
 const { Option } = Select;
 const { Step } = Steps;
-
-const departureOptions = [
-    { id: 1, name: "Hà Nội" },
-    { id: 2, name: "Đà Nẵng" },
-    { id: 3, name: "TP Hồ Chí Minh" },
-    { id: 4, name: "Nha Trang" },
-    { id: 5, name: "Hà Nam" },
-];
-
 const { Title } = Typography;
 
-const TourDetail = ({ tour }) => {
+const TourDetail = () => {
+    const { tourId } = useParams();
     const [isEditing, setIsEditing] = useState(false);
-    const [tourData, setTourData] = useState(
-        tour || {
-            id: "T001",
-            name: "Tour Hà Nội - Hạ Long",
-            prices: [
-                { type: "Người lớn (Từ 12 tuổi trở lên)", price: 2000000 },
-                { type: "Trẻ em (Từ 5 đến 11 tuổi)", price: 1000000 },
-                { type: "Trẻ nhỏ (Từ 2 đến 4 tuổi)", price: 500000 },
-                { type: "Em bé (Dưới 2 tuổi)", price: 0 },
-            ],
-            itinerary: [
-                { id: 1, value: "Vịnh Hạ Long", day: 1 },
-                { id: 2, value: "Chùa Một Cột", day: 2 },
-            ],
-            departurePoint: { id: 1, name: "Hà Nội" },
-            description: "Tour khám phá Vịnh Hạ Long với các hoạt động thú vị.",
-        }
-    );
-    const [newTourData, setNewTourData] = useState(tourData);
-    const [description, setDescription] = useState(tourData.description);
+    const [tourData, setTourData] = useState(null);
+    const [newTourData, setNewTourData] = useState(null);
+    const [description, setDescription] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [departureOptions, setDepartureOptions] = useState([]);
+    const [touristPlaces, setTouristPlaces] = useState([]);
+
+    useEffect(() => {
+        const fetchAll = async () => {
+            setLoading(true);
+            try {
+                const [tourRes, citiesRes, placesRes] = await Promise.all([
+                    fetchTourById(tourId),
+                    fetchCities(),
+                    fetchTouristPlaces(),
+                ]);
+                setDepartureOptions(citiesRes);
+                setTouristPlaces(placesRes);
+
+                // Chuyển đổi dữ liệu từ API về đúng định dạng
+                setTourData({
+                    ...tourRes,
+                    prices: tourRes.tourPassengers.map((p) => ({
+                        type: p.passengerTypeName,
+                        price: p.price,
+                    })),
+                    itinerary: tourRes.tourPlaces.map((place) => ({
+                        id: place.id,
+                        value: place.touristPlace.id,
+                        day: place.day,
+                    })),
+                    departurePoint: tourRes.departurePoint,
+                    description: tourRes.description,
+                });
+                setNewTourData({
+                    ...tourRes,
+                    prices: tourRes.tourPassengers.map((p) => ({
+                        type: p.passengerTypeName,
+                        price: p.price,
+                    })),
+                    itinerary: tourRes.tourPlaces.map((place) => ({
+                        id: place.id,
+                        value: place.touristPlace.id,
+                        day: place.day,
+                    })),
+                    departurePoint: tourRes.departurePoint,
+                    description: tourRes.description,
+                });
+                setDescription(tourRes.description);
+            } catch (err) {
+                message.error("Không thể tải dữ liệu tour!");
+            }
+            setLoading(false);
+        };
+        fetchAll();
+    }, [tourId]);
+
+    if (loading || !tourData || !newTourData) {
+        return (
+            <div style={{ padding: 48, textAlign: "center" }}>
+                <Spin size="large" />
+            </div>
+        );
+    }
 
     const handleAddLocation = () => {
-        const newId = tourData.itinerary.length + 1;
-        setTourData({
-            ...tourData,
+        const newId =
+            (newTourData.itinerary.length > 0
+                ? Math.max(...newTourData.itinerary.map((l) => l.id))
+                : 0) + 1;
+        setNewTourData({
+            ...newTourData,
             itinerary: [
-                ...tourData.itinerary,
+                ...newTourData.itinerary,
                 { id: newId, value: null, day: null },
             ],
         });
@@ -90,13 +137,17 @@ const TourDetail = ({ tour }) => {
     };
 
     const handleSave = () => {
-        setTourData(newTourData);
+        setTourData({
+            ...newTourData,
+            description,
+        });
         setIsEditing(false);
         message.success("Thông tin tour đã được lưu!");
     };
 
     const handleCancel = () => {
         setNewTourData(tourData);
+        setDescription(tourData.description);
         setIsEditing(false);
         message.info("Chỉnh sửa đã bị hủy.");
     };
@@ -129,6 +180,19 @@ const TourDetail = ({ tour }) => {
                     tourData.name
                 )}
             </Title>
+
+            <div style={{ marginBottom: 16 }}>
+                <span style={{ fontWeight: 500, marginRight: 8 }}>
+                    Đánh giá:
+                </span>
+                <Rate
+                    allowHalf
+                    disabled
+                    value={tourData.rating}
+                    style={{ color: "#faad14" }}
+                />
+                <span style={{ marginLeft: 8 }}>{tourData.rating}</span>
+            </div>
 
             <Form layout="vertical" style={{ maxWidth: "800px", margin: "0" }}>
                 <Form.Item
@@ -199,8 +263,8 @@ const TourDetail = ({ tour }) => {
                                           </span>
                                       }
                                       type="number"
-                                      // defaultValue={price.price}
                                       value={price.price}
+                                      readOnly
                                   />
                               </div>
                           ))}
@@ -227,7 +291,7 @@ const TourDetail = ({ tour }) => {
                                             <>
                                                 <Select
                                                     placeholder="Chọn địa điểm"
-                                                    style={{ width: "300px" }}
+                                                    style={{ width: "220px" }}
                                                     value={location.value}
                                                     showSearch
                                                     filterOption={(
@@ -247,13 +311,15 @@ const TourDetail = ({ tour }) => {
                                                         )
                                                     }
                                                 >
-                                                    {departureOptions.map(
-                                                        (loc) => (
+                                                    {touristPlaces.map(
+                                                        (place) => (
                                                             <Option
-                                                                key={loc.id}
-                                                                value={loc.name}
+                                                                key={place.id}
+                                                                value={place.id}
                                                             >
-                                                                {loc.name}
+                                                                {
+                                                                    place.placeName
+                                                                }
                                                             </Option>
                                                         )
                                                     )}
@@ -284,7 +350,14 @@ const TourDetail = ({ tour }) => {
                                             </>
                                         ) : (
                                             <>
-                                                <span>{location.value}</span>
+                                                <span>
+                                                    {touristPlaces.find(
+                                                        (p) =>
+                                                            p.id ===
+                                                            location.value
+                                                    )?.placeName ||
+                                                        location.value}
+                                                </span>
                                                 <span>
                                                     Ngày: {location.day}
                                                 </span>

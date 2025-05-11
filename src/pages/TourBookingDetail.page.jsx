@@ -1,54 +1,89 @@
-import React from "react";
-import { Descriptions, Typography, Divider, Switch, Form, Input } from "antd";
+import React, { useEffect, useState } from "react";
+import moment from "moment";
+import {
+    Descriptions,
+    Typography,
+    Divider,
+    Switch,
+    Form,
+    Input,
+    Spin,
+    message,
+} from "antd";
+import { useParams } from "react-router-dom";
+import { fetchTourBookingDetail } from "../services/api";
 
 const { Title } = Typography;
 
-const TourBookingDetail = ({ booking }) => {
-    const Booking_Data = booking || {
-        tour: {
-            id: "T001",
-            name: "Tour Hà Nội - Hạ Long",
-            prices: [
-                { type: "Người lớn (Từ 12 tuổi trở lên)", price: 2000000 },
-                { type: "Trẻ em (Từ 5 đến 11 tuổi)", price: 1000000 },
-                { type: "Trẻ nhỏ (Từ 2 đến 4 tuổi)", price: 500000 },
-                { type: "Em bé (Dưới 2 tuổi)", price: 0 },
-            ],
-            itinerary: [
-                { id: 1, value: "Vịnh Hạ Long", day: 1 },
-                { id: 2, value: "Chùa Một Cột", day: 2 },
-            ],
-            departurePoint: { id: 1, name: "Hà Nội" },
-            type: "Doanh nghiệp",
-        },
-        customer: {
-            name: "Nguyễn Văn A",
-            email: "nguyenvana@example.com",
-            phone: "0123456789",
-        },
-        booking: {
-            id: "B001",
-            bookingDate: "2025-04-01 12:00:00",
-            status: "Chờ xác nhận",
-            departureDate: "2025-05-01",
-            people: [
-                { type: "Người lớn", count: 2 },
-                { type: "Trẻ em", count: 1 },
-                { type: "Trẻ nhỏ", count: 1 },
-                { type: "Em bé", count: 0 },
-            ],
-            numOfPeople: 4,
-            totalPrice: 5000000,
-            vat: 10,
-            discount: 10,
-            totalPriceAfterDiscount: 4500000,
-            prevPercent: 60,
-            prevPayment: 2700000,
-            prevPaymentDate: "2025-04-01 12:00:00",
-        },
-    };
+const TourBookingDetail = () => {
+    const { tourBookingId } = useParams();
+    const [bookingData, setBookingData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const [bookingData, setBookingData] = React.useState(Booking_Data);
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const res = await fetchTourBookingDetail(tourBookingId);
+                // Chuẩn hóa dữ liệu cho UI
+                setBookingData({
+                    tour: {
+                        id: res.tour.id,
+                        name: res.tour.name,
+                        prices: res.tour.tourPassengers.map((p) => ({
+                            type: p.passengerTypeName,
+                            price: p.price,
+                        })),
+                        itinerary: res.tour.tourPlaces.map((place) => ({
+                            id: place.id,
+                            value: place.touristPlace.placeName,
+                            day: place.day,
+                        })),
+                        departurePoint: res.tour.departurePoint,
+                        type: res.tour.isCustom ? "Cá nhân" : "Doanh nghiệp",
+                    },
+                    customer: {
+                        name: res.user?.name,
+                        email: res.user?.email,
+                        phone: res.user?.phoneNumber,
+                    },
+                    booking: {
+                        id: res.tourBookingId,
+                        bookingDate: res.payments?.[0]?.paymentDate || "",
+                        status: res.status,
+                        departureDate: res.departureDate,
+                        people: res.bookingPassengers.map((bp) => ({
+                            type: bp.passengerType?.passengerTypeName,
+                            count: bp.numberOfPerson,
+                        })),
+                        numOfPeople: res.bookingPassengers.reduce(
+                            (sum, bp) => sum + (bp.numberOfPerson || 0),
+                            0
+                        ),
+                        totalPrice: res.totalAmount,
+                        vat: res.tour.tax,
+                        discount: res.tour.discount,
+                        totalPriceAfterDiscount:
+                            res.totalAmount -
+                            (res.totalAmount * (res.tour.discount || 0)) / 100,
+                        prevPercent: res.tour.prevPercent,
+                        prevPayment:
+                            res.payments && res.payments.length > 0
+                                ? res.payments.reduce(
+                                      (sum, p) => sum + (p.amount || 0),
+                                      0
+                                  )
+                                : 0,
+                        payments: res.payments || [],
+                    },
+                });
+            } catch (err) {
+                message.error("Không thể tải chi tiết booking!");
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, [tourBookingId]);
 
     const handleStatusChange = (checked) => {
         setBookingData((prevData) => ({
@@ -59,6 +94,14 @@ const TourBookingDetail = ({ booking }) => {
             },
         }));
     };
+
+    if (loading || !bookingData) {
+        return (
+            <div style={{ padding: 48, textAlign: "center" }}>
+                <Spin size="large" />
+            </div>
+        );
+    }
 
     return (
         <div style={{ padding: "24px" }}>
@@ -88,8 +131,6 @@ const TourBookingDetail = ({ booking }) => {
                         </div>
                     ))}
                 </Descriptions.Item>
-
-                {/* handle type tour: Doanh nghiệp, cá nhân */}
                 <Descriptions.Item label="Giá tour (VNĐ)">
                     {bookingData.tour.prices.map((price, index) => (
                         <div key={index}>
@@ -152,25 +193,34 @@ const TourBookingDetail = ({ booking }) => {
                     {bookingData.booking.totalPriceAfterDiscount.toLocaleString()}{" "}
                     VNĐ
                 </Descriptions.Item>
-                <Descriptions.Item label="Đặt cọc (%)">
+                <Descriptions.Item label="Yêu cầu đặt cọc (%)">
                     {bookingData.booking.prevPercent} %
                 </Descriptions.Item>
                 <Descriptions.Item label="Số tiền đã đặt cọc (VNĐ)">
                     {bookingData.booking.prevPayment.toLocaleString()} VNĐ
                 </Descriptions.Item>
-                <Descriptions.Item label="Ngày đặt cọc">
-                    {bookingData.booking.prevPaymentDate}
+                <Descriptions.Item label="Các lần chuyển khoản">
+                    {Array.isArray(bookingData.booking.payments) &&
+                    bookingData.booking.payments.length > 0 ? (
+                        bookingData.booking.payments.map((p, idx) => (
+                            <div key={idx}>
+                                {p.amount.toLocaleString()} VNĐ -{" "}
+                                <i>
+                                    {" "}
+                                    {moment(p.paymentDate).format(
+                                        "HH:mm:ss DD/MM/YYYY"
+                                    )}
+                                </i>
+                            </div>
+                        ))
+                    ) : (
+                        <span>Chưa có thanh toán</span>
+                    )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">
-                    {/* Trạng thái có thể là "Chờ xác nhận" hoặc "Đã xác nhận" */}
                     <span>{bookingData.booking.status}</span>
-
                     <Switch
-                        checked={
-                            bookingData.booking.status === "Đã xác nhận"
-                                ? true
-                                : false
-                        }
+                        checked={bookingData.booking.status === "Đã xác nhận"}
                         onChange={handleStatusChange}
                         style={{ marginLeft: "16px" }}
                     >

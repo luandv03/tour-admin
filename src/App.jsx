@@ -47,7 +47,7 @@ function App() {
 
                     <Route
                         path="/tour-booking/:tourBookingId"
-                        element={<TourBookingRequestDetail />}
+                        element={<TourBookingDetail />}
                     />
 
                     <Route path="/tours/create" element={<CreateNewTour />} />

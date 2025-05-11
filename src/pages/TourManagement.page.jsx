@@ -1,32 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Table, Space, Button, Input, Select, Row, Col } from "antd";
+import { Table, Space, Button, Input, Select, message } from "antd";
 import { EyeOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { fetchTours } from "../services/api";
 
 const { Option } = Select;
-
-const dataSource = [
-    {
-        id: 1,
-        name: "Tour Hà Nội - Hạ Long",
-        price: "2,500,000 VNĐ",
-        departure: "Hà Nội",
-        totalDays: 3,
-    },
-    {
-        id: 2,
-        name: "Tour Đà Nẵng - Hội An",
-        price: "3,000,000 VNĐ",
-        departure: "Đà Nẵng",
-        totalDays: 4,
-    },
-];
 
 const TourManagement = () => {
     const [searchText, setSearchText] = useState("");
     const [filterDeparture, setFilterDeparture] = useState("");
-    const [filteredData, setFilteredData] = useState(dataSource);
+    const [data, setData] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    const fetchTour = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchTours();
+            setData(res);
+            setFilteredData(res);
+        } catch (err) {
+            message.error("Không thể tải dữ liệu tour!");
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchTour();
+    }, []);
 
     const columns = [
         {
@@ -41,18 +43,30 @@ const TourManagement = () => {
         },
         {
             title: "Giá Tour",
-            dataIndex: "price",
             key: "price",
+            render: (_, record) =>
+                record.tourPassengers && record.tourPassengers.length > 0
+                    ? record.tourPassengers
+                          .map(
+                              (p) =>
+                                  `${
+                                      p.passengerTypeName
+                                  }: ${p.price.toLocaleString()} VNĐ`
+                          )
+                          .join(" | ")
+                    : "N/A",
         },
         {
             title: "Điểm Khởi Hành",
-            dataIndex: "departure",
+            dataIndex: ["departurePoint", "name"],
             key: "departure",
+            render: (_, record) =>
+                record.departurePoint ? record.departurePoint.name : "",
         },
         {
-            title: "Tổng Số Ngày",
-            dataIndex: "totalDays",
-            key: "totalDays",
+            title: "Đánh Giá",
+            dataIndex: "rating",
+            key: "rating",
         },
         {
             title: "Hành Động",
@@ -76,24 +90,52 @@ const TourManagement = () => {
     ];
 
     const handleDelete = (record) => {
-        console.log("Delete tour:", record);
+        message.info(`Xóa tour: ${record.name}`);
     };
 
     const handleSearch = (value) => {
         setSearchText(value);
-        const filtered = dataSource.filter((item) =>
-            item.name.toLowerCase().includes(value.toLowerCase())
-        );
+        let filtered = data;
+        if (value) {
+            filtered = filtered.filter((item) =>
+                item.name.toLowerCase().includes(value.toLowerCase())
+            );
+        }
+        if (filterDeparture) {
+            filtered = filtered.filter(
+                (item) =>
+                    (item.departurePoint &&
+                        item.departurePoint.name === filterDeparture) ||
+                    filterDeparture === ""
+            );
+        }
         setFilteredData(filtered);
     };
 
     const handleFilter = (value) => {
         setFilterDeparture(value);
-        const filtered = dataSource.filter(
-            (item) => item.departure === value || value === ""
-        );
+        let filtered = data;
+        if (searchText) {
+            filtered = filtered.filter((item) =>
+                item.name.toLowerCase().includes(searchText.toLowerCase())
+            );
+        }
+        if (value) {
+            filtered = filtered.filter(
+                (item) =>
+                    (item.departurePoint &&
+                        item.departurePoint.name === value) ||
+                    value === ""
+            );
+        }
         setFilteredData(filtered);
     };
+
+    const departureOptions = [
+        ...new Set(
+            data.map((item) => item.departurePoint?.name).filter(Boolean)
+        ),
+    ];
 
     return (
         <div>
@@ -104,16 +146,21 @@ const TourManagement = () => {
                     allowClear
                     onSearch={handleSearch}
                     enterButton
+                    style={{ width: 250 }}
                 />
                 <Select
                     placeholder="Lọc theo điểm khởi hành"
                     style={{ width: 200 }}
                     allowClear
                     onChange={handleFilter}
+                    value={filterDeparture || undefined}
                 >
                     <Option value="">Tất cả</Option>
-                    <Option value="Hà Nội">Hà Nội</Option>
-                    <Option value="Đà Nẵng">Đà Nẵng</Option>
+                    {departureOptions.map((name) => (
+                        <Option key={name} value={name}>
+                            {name}
+                        </Option>
+                    ))}
                 </Select>
             </Space>
 
@@ -131,6 +178,7 @@ const TourManagement = () => {
                 columns={columns}
                 rowKey="id"
                 bordered
+                loading={loading}
             />
         </div>
     );

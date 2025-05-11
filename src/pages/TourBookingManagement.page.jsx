@@ -1,45 +1,64 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Table, Space, Button, Input, Modal, Radio, Select } from "antd";
 import {
-    EyeOutlined,
-    EditOutlined,
-    DeleteOutlined,
-    FilterOutlined,
-} from "@ant-design/icons";
+    Table,
+    Space,
+    Button,
+    Input,
+    Modal,
+    Select,
+    Spin,
+    message,
+} from "antd";
+import { EyeOutlined, DeleteOutlined, FilterOutlined } from "@ant-design/icons";
+import { bookTour, fetchAllTourBookings } from "../services/api";
 
-const dataSource = [
-    {
-        id: 1,
-        name: "Tour Hà Nội - Hạ Long",
-        customer: "Nguyễn Văn A",
-        email: "dinhvanluan2k3@gmail.com",
-        phonenumber: "0123456789",
-        departureDate: "2023-10-01",
-        numsofPeople: 2,
-        type: "Cá nhân",
-        status: "Chờ xác nhận",
-    },
-    {
-        id: 2,
-        name: "Tour Đà Nẵng - Hội An",
-        customer: "Nguyễn Đức Phú",
-        email: "ducphu2k3@gmail.com",
-        phonenumber: "0123456789",
-        departureDate: "2023-10-01",
-        numsofPeople: 3,
-        type: "Doanh nghiệp",
-        status: "Đã xác nhận",
-    },
-];
+const { Option } = Select;
 
 const TourBookingManagement = () => {
     const navigate = useNavigate();
     const [searchText, setSearchText] = useState("");
     const [isFilterVisible, setIsFilterVisible] = useState(false);
-    const [filterType, setFilterType] = useState(""); // Loại tour
-    const [filterStatus, setFilterStatus] = useState(""); // Trạng thái
-    const [filteredData, setFilteredData] = useState(dataSource);
+    const [filterType, setFilterType] = useState("");
+    const [filterStatus, setFilterStatus] = useState("");
+    const [dataSource, setDataSource] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const res = await fetchAllTourBookings();
+                // Chuẩn hóa dữ liệu cho table
+                const data = res.map((item) => ({
+                    id: item.tour.id,
+                    name: item.tour?.name,
+                    tourBookingId: item.tourBookingId,
+                    departureDate: item.departureDate,
+                    numsofPeople: item.bookingPassengers?.reduce(
+                        (sum, p) => sum + (p.numberOfPerson || 0),
+                        0
+                    ),
+                    type: item.tour?.isCustom ? "Cá nhân" : "Doanh nghiệp",
+                    status:
+                        item.status === "DA_THANH_TOAN"
+                            ? "Đã thanh toán"
+                            : item.status === "CHO_XAC_NHAN"
+                            ? "Chờ xác nhận"
+                            : item.status === "DA_XAC_NHAN"
+                            ? "Đã xác nhận"
+                            : item.status,
+                }));
+                setDataSource(data);
+                setFilteredData(data);
+            } catch (err) {
+                message.error("Không thể tải dữ liệu tour booking!");
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, []);
 
     const columns = [
         {
@@ -53,19 +72,9 @@ const TourBookingManagement = () => {
             key: "name",
         },
         {
-            title: "Khách Hàng",
-            dataIndex: "customer",
-            key: "customer",
-        },
-        {
-            title: "Email",
-            dataIndex: "email",
-            key: "email",
-        },
-        {
-            title: "Liên hệ",
-            dataIndex: "phonenumber",
-            key: "phonenumber",
+            title: "Mã booking",
+            dataIndex: "tourBookingId",
+            key: "tourBookingId",
         },
         {
             title: "Ngày khởi hành",
@@ -95,9 +104,10 @@ const TourBookingManagement = () => {
                     <Button
                         type="link"
                         icon={<EyeOutlined />}
-                        onClick={() => navigate(`/tour-booking/${record.id}`)}
+                        onClick={() =>
+                            navigate(`/tour-booking/${record.tourBookingId}`)
+                        }
                     />
-
                     <Button
                         type="link"
                         danger
@@ -109,22 +119,14 @@ const TourBookingManagement = () => {
         },
     ];
 
-    const handleView = (record) => {
-        console.log("View tour:", record);
-    };
-
-    const handleEdit = (record) => {
-        console.log("Edit tour:", record);
-    };
-
     const handleDelete = (record) => {
-        console.log("Delete tour:", record);
+        message.info(`Xóa booking: ${record.name}`);
     };
 
     const handleSearch = (value) => {
         setSearchText(value);
         const filtered = dataSource.filter((item) =>
-            item.name.toLowerCase().includes(value.toLowerCase())
+            (item.name || "").toLowerCase().includes(value.toLowerCase())
         );
         setFilteredData(filtered);
     };
@@ -168,7 +170,7 @@ const TourBookingManagement = () => {
             {/* Popup Filter */}
             <Modal
                 title="Lọc Tour"
-                visible={isFilterVisible}
+                open={isFilterVisible}
                 onCancel={() => setIsFilterVisible(false)}
                 footer={[
                     <Button key="reset" onClick={handleFilterReset}>
@@ -190,7 +192,7 @@ const TourBookingManagement = () => {
                         style={{ width: 200 }}
                         allowClear
                         value={filterType}
-                        onChange={(value) => setFilterType(value)} // Cập nhật giá trị `filterType`
+                        onChange={(value) => setFilterType(value)}
                     >
                         <Option value="">Tất cả</Option>
                         <Option value="Cá nhân">Cá nhân</Option>
@@ -204,11 +206,12 @@ const TourBookingManagement = () => {
                         style={{ width: 200 }}
                         allowClear
                         value={filterStatus}
-                        onChange={(value) => setFilterStatus(value)} // Cập nhật giá trị `filterStatus`
+                        onChange={(value) => setFilterStatus(value)}
                     >
                         <Option value="">Tất cả</Option>
-                        <Option value="Chưa xác nhận">Chưa xác nhận</Option>
+                        <Option value="Chờ xác nhận">Chờ xác nhận</Option>
                         <Option value="Đã xác nhận">Đã xác nhận</Option>
+                        <Option value="Đã thanh toán">Đã thanh toán</Option>
                     </Select>
                 </div>
             </Modal>
@@ -219,6 +222,7 @@ const TourBookingManagement = () => {
                 columns={columns}
                 rowKey="id"
                 bordered
+                loading={loading}
             />
         </div>
     );

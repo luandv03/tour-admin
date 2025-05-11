@@ -6,43 +6,15 @@ import {
     Select,
     Space,
     Modal,
-    Form,
     message,
+    Image,
+    Tag,
 } from "antd";
-import {
-    PlusOutlined,
-    EyeOutlined,
-    EditOutlined,
-    DeleteOutlined,
-} from "@ant-design/icons";
+import { PlusOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import { fetchTouristPlaces } from "../services/api";
 
 const { Option } = Select;
-
-const mockData = [
-    {
-        tourist_place_id: "1",
-        name: "Vịnh Hạ Long",
-        description: "Một trong bảy kỳ quan thiên nhiên thế giới.",
-        address: "Quảng Ninh",
-        city: "Quảng Ninh",
-        type: "Bãi biển",
-        ticket_price: 200000,
-        rating: 4.8,
-    },
-    {
-        tourist_place_id: "2",
-        name: "Chùa Một Cột",
-        description: "Ngôi chùa nổi tiếng tại Hà Nội.",
-        address: "Hà Nội",
-        city: "Hà Nội",
-        type: "Chùa chiền",
-        ticket_price: 0,
-        rating: 4.7,
-    },
-];
 
 const TouristPlaceManagementPage = () => {
     const [data, setData] = useState([]);
@@ -53,12 +25,17 @@ const TouristPlaceManagementPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Giả lập gọi API để lấy dữ liệu
-        setLoading(true);
-        setTimeout(() => {
-            setData(mockData);
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const res = await fetchTouristPlaces();
+                setData(res);
+            } catch (err) {
+                message.error("Không thể tải dữ liệu địa điểm!");
+            }
             setLoading(false);
-        }, 1000);
+        };
+        fetchData();
     }, []);
 
     const handleSearch = (value) => {
@@ -77,9 +54,7 @@ const TouristPlaceManagementPage = () => {
             cancelText: "Hủy",
             onOk: () => {
                 setData((prevData) =>
-                    prevData.filter(
-                        (place) => place.tourist_place_id !== placeId
-                    )
+                    prevData.filter((place) => place.id !== placeId)
                 );
                 message.success("Xóa địa điểm thành công!");
             },
@@ -88,15 +63,38 @@ const TouristPlaceManagementPage = () => {
 
     const filteredData = data.filter(
         (place) =>
-            place.name.toLowerCase().includes(searchText.toLowerCase()) &&
-            (!filterType || place.type === filterType)
+            (place.placeName
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+                place.address
+                    ?.toLowerCase()
+                    .includes(searchText.toLowerCase()) ||
+                place.city?.name
+                    ?.toLowerCase()
+                    .includes(searchText.toLowerCase())) &&
+            (!filterType || place.placeType?.name === filterType)
     );
 
     const columns = [
         {
             title: "Tên địa điểm",
-            dataIndex: "name",
-            key: "name",
+            dataIndex: "placeName",
+            key: "placeName",
+        },
+        {
+            title: "Hình ảnh",
+            dataIndex: "images",
+            key: "images",
+            render: (images) =>
+                images && images.length > 0 ? (
+                    <Image
+                        width={80}
+                        src={images[0].imageUrl}
+                        alt="tourist place"
+                    />
+                ) : (
+                    <span>Không có ảnh</span>
+                ),
         },
         {
             title: "Địa chỉ",
@@ -105,24 +103,27 @@ const TouristPlaceManagementPage = () => {
         },
         {
             title: "Thành phố",
-            dataIndex: "city",
+            dataIndex: ["city", "name"],
             key: "city",
+            render: (_, record) => record.city?.name || "",
         },
         {
             title: "Loại",
-            dataIndex: "type",
+            dataIndex: ["placeType", "name"],
             key: "type",
+            render: (_, record) =>
+                record.placeType?.name ? (
+                    <Tag color="blue">{record.placeType.name}</Tag>
+                ) : (
+                    ""
+                ),
         },
+
         {
-            title: "Giá vé (VNĐ)",
-            dataIndex: "ticket_price",
-            key: "ticket_price",
-            render: (value) => value.toLocaleString(),
-        },
-        {
-            title: "Đánh giá",
-            dataIndex: "rating",
-            key: "rating",
+            title: "Mô tả",
+            dataIndex: "description",
+            key: "description",
+            ellipsis: true,
         },
         {
             title: "Hành động",
@@ -132,28 +133,22 @@ const TouristPlaceManagementPage = () => {
                     <Button
                         type="link"
                         icon={<EyeOutlined />}
-                        onClick={() =>
-                            navigate(
-                                "/manage-places/" + record.tourist_place_id
-                            )
-                        }
+                        onClick={() => navigate("/manage-places/" + record.id)}
                     />
-                    {/* <Button
-                        type="link"
-                        icon={<EditOutlined />}
-                        // onClick={() => handleEdit(record)}
-                    /> */}
                     <Button
                         type="link"
                         danger
                         icon={<DeleteOutlined />}
-                        onClick={() =>
-                            handleDeletePlace(record.tourist_place_id)
-                        }
+                        onClick={() => handleDeletePlace(record.id)}
                     />
                 </Space>
             ),
         },
+    ];
+
+    // Lấy danh sách loại địa điểm duy nhất cho filter
+    const placeTypes = [
+        ...new Set(data.map((place) => place.placeType?.name).filter(Boolean)),
     ];
 
     return (
@@ -161,7 +156,7 @@ const TouristPlaceManagementPage = () => {
             <h1>Quản lý địa điểm du lịch</h1>
             <Space style={{ marginTop: 16 }}>
                 <Input.Search
-                    placeholder="Tìm kiếm địa điểm"
+                    placeholder="Tìm kiếm địa điểm, địa chỉ, thành phố"
                     onSearch={handleSearch}
                     allowClear
                 />
@@ -172,10 +167,11 @@ const TouristPlaceManagementPage = () => {
                     allowClear
                 >
                     <Option value="Tất cả">Tất cả</Option>
-                    <Option value="Bãi biển">Bãi biển</Option>
-                    <Option value="Chùa chiền">Chùa chiền</Option>
-                    <Option value="Núi">Núi</Option>
-                    <Option value="Di tích lịch sử">Di tích lịch sử</Option>
+                    {placeTypes.map((type) => (
+                        <Option key={type} value={type}>
+                            {type}
+                        </Option>
+                    ))}
                 </Select>
             </Space>
 
@@ -192,7 +188,7 @@ const TouristPlaceManagementPage = () => {
             <Table
                 columns={columns}
                 dataSource={filteredData}
-                rowKey="tourist_place_id"
+                rowKey="id"
                 loading={loading}
                 bordered
             />

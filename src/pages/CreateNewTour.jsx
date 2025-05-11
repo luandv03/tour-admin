@@ -1,103 +1,67 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, Input, Button, Select, Space, Steps, Flex, message } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import ReactQuill from "react-quill-new";
 import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { notification } from "antd"; // Thêm dòng này ở đầu file
 import {
-    MapContainer,
-    TileLayer,
-    Marker,
-    useMapEvents,
-    useMap,
-} from "react-leaflet";
+    fetchTouristPlaces,
+    fetchCities,
+    fetchPassengerTypes,
+    createTour,
+} from "../services/api";
 
 const { Option } = Select;
 const { Step } = Steps;
 
-const departureOptions = [
-    {
-        id: 1,
-        name: "Hà Nội",
-    },
-    {
-        id: 2,
-        name: "Đà Nẵng",
-    },
-    {
-        id: 3,
-        name: "TP Hồ Chí Minh",
-    },
-    {
-        id: 4,
-        name: "Nha Trang",
-    },
-    {
-        id: 5,
-        name: "Hà Nam",
-    },
-];
-
 const CreateNewTour = () => {
     const [description, setDescription] = useState("");
-    const [locations, setLocations] = useState([{ id: 1, value: null }]); // Danh sách địa điểm trong tour
-    const [locationId, setLocationId] = useState(2); // ID tiếp theo cho địa điểm
-    const [departure, setDeparture] = useState({
-        id: 1,
-        name: "Hà Nội",
-    }); // Trạng thái cho điểm khởi hành
-    const navigate = useNavigate(); // Sử dụng useNavigate để điều hướng
-    const [selectedLocation, setSelectedLocation] = useState([
-        {
-            id: 0,
-            latitude: null,
-            longitude: null,
-            address: "",
-        },
+    const [locations, setLocations] = useState([
+        { id: 1, value: null, day: 1 },
     ]);
+    const [locationId, setLocationId] = useState(2);
+    const [departure, setDeparture] = useState(null);
+    const [touristPlaces, setTouristPlaces] = useState([]);
+    const [cities, setCities] = useState([]);
+    const [prices, setPrices] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
-    const availableLocations = [
-        {
-            id: 10,
-            name: "Vịnh Hạ Long",
-            latitude: 20.9101,
-            longitude: 107.1839,
-        },
-        {
-            id: 22,
-            name: "Chùa Một Cột",
-            latitude: 21.0285,
-            longitude: 105.8342,
-        },
-        { id: 3, name: "Núi Fansipan", latitude: 22.2587, longitude: 103.8141 },
-        { id: 4, name: "Đà Lạt", latitude: 11.9401, longitude: 108.4583 },
-        { id: 5, name: "Lăng Bác", latitude: 21.0369, longitude: 105.8342 },
-        {
-            id: 6,
-            name: "Văn Miếu Quốc Tử Giám",
-            latitude: 21.0278,
-            longitude: 105.8342,
-        },
-        {
-            id: 7,
-            name: "Nhà Tù Hỏa Lò",
-            latitude: 21.0278,
-            longitude: 105.8552,
-        },
-        { id: 8, name: "Sun*", latitude: 21.0285, longitude: 105.8542 },
-    ]; // Danh sách địa điểm có sẵn
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [placesRes, citiesRes, passengerTypesRes] =
+                    await Promise.all([
+                        fetchTouristPlaces(),
+                        fetchCities(),
+                        fetchPassengerTypes(),
+                    ]);
+
+                console.log(passengerTypesRes);
+
+                setTouristPlaces(placesRes);
+                setCities(citiesRes);
+                setDeparture(citiesRes[0]);
+                setPrices(
+                    passengerTypesRes.map((type) => ({
+                        passengerTypeId: type.passengerTypeId,
+                        passengerTypeName: type.passengerTypeName,
+                        price: "",
+                    }))
+                );
+            } catch (err) {
+                message.error("Không thể tải dữ liệu khởi tạo!");
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, []);
 
     const handleAddLocation = () => {
-        setLocations([
-            ...locations,
-            {
-                id: locationId,
-                value: null,
-                locationId: 0,
-                latitude: null,
-                longitude: null,
-            },
-        ]);
+        setLocations([...locations, { id: locationId, value: null, day: 1 }]);
         setLocationId(locationId + 1);
     };
 
@@ -105,39 +69,12 @@ const CreateNewTour = () => {
         setLocations(locations.filter((location) => location.id !== id));
     };
 
-    const handleLocationChange = (id, value, loc) => {
+    const handleLocationChange = (id, value) => {
         setLocations(
             locations.map((location) =>
-                location.id === id
-                    ? {
-                          ...location,
-                          value,
-                          longitude: loc.longitude,
-                          latitude: loc.latitude,
-                          locationId: loc.id,
-                      }
-                    : location
+                location.id === id ? { ...location, value } : location
             )
         );
-    };
-
-    const handleSubmit = (values) => {
-        const selectedLocations = locations
-            .filter((location) => location.value)
-            .map((location) => location.value);
-
-        if (selectedLocations.length === 0) {
-            message.error("Vui lòng chọn ít nhất một địa điểm.");
-            return;
-        }
-
-        const newTour = {
-            ...values,
-            locations: selectedLocations,
-        };
-
-        console.log("Tour mới:", newTour);
-        message.success("Tour mới đã được tạo thành công!");
     };
 
     const handleDayChange = (id, day) => {
@@ -150,41 +87,78 @@ const CreateNewTour = () => {
         );
     };
 
-    // const handleMapClick = (e) => {
-    //     const { lat, lng } = e.latlng;
-    //     fetch(
-    //         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-    //     )
-    //         .then((response) => response.json())
-    //         .then((data) => {
-    //             setSelectedLocation({
-    //                 latitude: lat,
-    //                 longitude: lng,
-    //                 address: data.display_name || "Không xác định",
-    //             });
-    //         })
-    //         .catch(() => {
-    //             message.error("Không thể lấy thông tin địa chỉ từ bản đồ.");
-    //         });
-    // };
+    const handlePriceChange = (e) => {
+        const { name, value } = e.target;
 
-    // const MapClickHandler = () => {
-    //     useMapEvents({
-    //         click: handleMapClick,
-    //     });
-    //     return null;
-    // };
+        setPrices((prev) => {
+            prev.forEach((p) => {
+                if (p.passengerTypeId == name) {
+                    p.price = value;
+                }
+            });
+            return [...prev];
+        });
+    };
 
-    // const MapUpdater = () => {
-    //     const map = useMap();
-    //     if (selectedLocation.latitude && selectedLocation.longitude) {
-    //         map.setView(
-    //             [selectedLocation.latitude, selectedLocation.longitude],
-    //             13
-    //         );
-    //     }
-    //     return null;
-    // };
+    const handleSubmit = async (values) => {
+        // Chuẩn hóa tourPlaces
+        const tourPlaces = locations
+            .filter((location) => location.value)
+            .map((location, idx) => ({
+                touristPlaceId: location.value,
+                day: location.day || 1,
+                orderInDay: idx + 1,
+            }));
+
+        console.log(prices);
+
+        // Chuẩn hóa passengerPrices
+        const passengerPrices = prices
+            .filter((p) => p.price !== "")
+            .map((p) => ({
+                passengerTypeId: p.passengerTypeId,
+                price: Number(p.price),
+            }));
+
+        console.log(passengerPrices);
+
+        if (
+            !values.name ||
+            !departure ||
+            tourPlaces.length === 0 ||
+            passengerPrices.length === 0
+        ) {
+            message.error("Vui lòng nhập đầy đủ thông tin bắt buộc!");
+            return;
+        }
+
+        const body = {
+            name: values.name,
+            description: description,
+            isCustom: false,
+            tax: 10,
+            discount: 5,
+            prevPercent: 20,
+            userId: 1,
+            departurePointId: departure.id,
+            tourPlaces,
+            passengerPrices,
+        };
+
+        setLoading(true);
+        try {
+            const res = await createTour(body);
+            message.success({
+                message: "Tạo tour thành công",
+                description: `Tour "${res.name}" đã được tạo!`,
+                duration: 2,
+            });
+            navigate(`/tours/${res.id}`);
+        } catch (error) {
+            message.error("Tạo tour thất bại!");
+        }
+        setLoading(false);
+    };
 
     return (
         <div style={{ padding: "24px" }}>
@@ -196,7 +170,7 @@ const CreateNewTour = () => {
             >
                 <Form.Item
                     name="name"
-                    label={<span style={{ fontWeight: "bold" }}>Tên tour</span>} // Label đậm hơn
+                    label={<span style={{ fontWeight: "bold" }}>Tên tour</span>}
                     rules={[
                         {
                             required: true,
@@ -206,68 +180,37 @@ const CreateNewTour = () => {
                 >
                     <Input placeholder="Nhập tên tour" />
                 </Form.Item>
+
                 <Form.Item
                     label={
                         <span style={{ fontWeight: "bold" }}>Giá (VNĐ)</span>
                     }
+                    required
                 >
-                    <Form.Item
-                        name="adultPrice"
-                        label="Người lớn (Từ 12 tuổi trở lên)"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Vui lòng nhập giá cho người lớn",
-                            },
-                        ]}
-                    >
-                        <Input
-                            type="number"
-                            placeholder="Nhập giá cho người lớn"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        name="childPrice"
-                        label="Trẻ em (Từ 5 đến 11 tuổi)"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Vui lòng nhập giá cho trẻ em",
-                            },
-                        ]}
-                    >
-                        <Input
-                            type="number"
-                            placeholder="Nhập giá cho trẻ em"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        name="toddlerPrice"
-                        label="Trẻ nhỏ (Từ 2 đến 4 tuổi)"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Vui lòng nhập giá cho trẻ nhỏ",
-                            },
-                        ]}
-                    >
-                        <Input
-                            type="number"
-                            placeholder="Nhập giá cho trẻ nhỏ"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        name="infantPrice"
-                        label="Em bé (Dưới 2 tuổi)"
-                        rules={[
-                            {
-                                required: true,
-                                message: "Vui lòng nhập giá cho em bé",
-                            },
-                        ]}
-                    >
-                        <Input type="number" placeholder="Nhập giá cho em bé" />
-                    </Form.Item>
+                    {prices.map((type, idx) => (
+                        <Form.Item
+                            key={type.passengerTypeId}
+                            name={type.passengerTypeId}
+                            label={type.passengerTypeName}
+                            rules={[
+                                {
+                                    required: true,
+                                    message: `Vui lòng nhập giá cho ${type.passengerTypeName}`,
+                                },
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                placeholder={`Giá cho ${type.passengerTypeName}`}
+                                name={type.passengerTypeId}
+                                value={type.price}
+                                onChange={(e) => handlePriceChange(e)}
+                                style={{ width: 300 }}
+                                min={0}
+                                required
+                            />
+                        </Form.Item>
+                    ))}
                 </Form.Item>
 
                 <Flex
@@ -279,12 +222,14 @@ const CreateNewTour = () => {
                         label={
                             <span style={{ fontWeight: "bold" }}>Lộ trình</span>
                         }
+                        style={{ flex: 1 }}
+                        required
                     >
                         <Steps direction="vertical" current={-1}>
-                            {locations.map((location) => (
+                            {locations.map((location, idx) => (
                                 <Step
                                     key={location.id}
-                                    title={`Địa điểm ${location.id}`}
+                                    title={`Địa điểm ${idx + 1}`}
                                     status="process"
                                     description={
                                         <Space
@@ -298,47 +243,35 @@ const CreateNewTour = () => {
                                                 placeholder="Chọn địa điểm"
                                                 style={{ width: "240px" }}
                                                 value={location.value}
-                                                showSearch // Cho phép tìm kiếm
+                                                showSearch
                                                 filterOption={(input, option) =>
                                                     option.children
                                                         .toLowerCase()
                                                         .includes(
                                                             input.toLowerCase()
                                                         )
-                                                } // Lọc danh sách dựa trên từ khóa tìm kiếm
-                                                onChange={(value, option) => {
+                                                }
+                                                onChange={(value) =>
                                                     handleLocationChange(
                                                         location.id,
-                                                        value,
-                                                        option.loc
-                                                    );
-                                                }}
+                                                        value
+                                                    )
+                                                }
                                             >
-                                                {availableLocations
-                                                    .filter(
-                                                        (loc) =>
-                                                            !locations.some(
-                                                                (selected) =>
-                                                                    selected.value ===
-                                                                    loc.name
-                                                            ) ||
-                                                            loc.name ===
-                                                                location.value
-                                                    ) // Chỉ hiển thị các địa điểm chưa được chọn hoặc địa điểm hiện tại
-                                                    .map((loc) => (
-                                                        <Option
-                                                            key={loc.id}
-                                                            value={loc.name}
-                                                            loc={loc}
-                                                        >
-                                                            {loc.name}
-                                                        </Option>
-                                                    ))}
+                                                {touristPlaces.map((loc) => (
+                                                    <Option
+                                                        key={loc.id}
+                                                        value={loc.id}
+                                                    >
+                                                        {loc.placeName}
+                                                    </Option>
+                                                ))}
                                             </Select>
                                             <Input
                                                 type="number"
                                                 placeholder="Ngày thứ mấy"
                                                 style={{ width: "100px" }}
+                                                value={location.day}
                                                 onChange={(e) =>
                                                     handleDayChange(
                                                         location.id,
@@ -357,7 +290,7 @@ const CreateNewTour = () => {
                                                             location.id
                                                         )
                                                     }
-                                                ></Button>
+                                                />
                                             )}
                                         </Space>
                                     }
@@ -381,7 +314,7 @@ const CreateNewTour = () => {
                             }}
                         >
                             <MapContainer
-                                center={[21.028511, 105.804817]} // Tọa độ mặc định (Hà Nội)
+                                center={[21.028511, 105.804817]}
                                 zoom={13}
                                 style={{ height: "100%", width: "100%" }}
                             >
@@ -390,13 +323,16 @@ const CreateNewTour = () => {
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                 />
                                 {locations.map((location) => {
+                                    const place = touristPlaces.find(
+                                        (p) => p.id === location.value
+                                    );
                                     return (
-                                        location.locationId && (
+                                        place && (
                                             <Marker
                                                 key={location.id}
                                                 position={[
-                                                    location.latitude,
-                                                    location.longitude,
+                                                    Number(place.latitude),
+                                                    Number(place.longitude),
                                                 ]}
                                             />
                                         )
@@ -407,42 +343,32 @@ const CreateNewTour = () => {
                     </Form.Item>
                 </Flex>
 
-                {/* Chọn điểm khởi hành */}
                 <Form.Item
                     label={
                         <span style={{ fontWeight: "bold" }}>
                             Điểm khởi hành
                         </span>
                     }
-                    rules={[
-                        {
-                            required: true,
-                            message: "Vui lòng chọn điểm khởi hành",
-                        },
-                    ]}
+                    required
                 >
                     <Select
                         placeholder="Chọn điểm khởi hành"
                         style={{ width: "300px" }}
-                        value={departure?.id} // Hiển thị giá trị `id` của điểm khởi hành
-                        showSearch // Cho phép tìm kiếm
+                        value={departure?.id}
+                        showSearch
                         filterOption={(input, option) =>
                             option.children
                                 .toLowerCase()
                                 .includes(input.toLowerCase())
-                        } // Lọc danh sách dựa trên từ khóa tìm kiếm
+                        }
                         onChange={(id) => {
-                            const selectedDeparture = departureOptions.find(
+                            const selectedDeparture = cities.find(
                                 (option) => option.id === id
                             );
-                            console.log(
-                                "Selected departure:",
-                                selectedDeparture
-                            );
-                            setDeparture(selectedDeparture); // Lưu cả `id` và `name` vào `departure`
+                            setDeparture(selectedDeparture);
                         }}
                     >
-                        {departureOptions.map((loc) => (
+                        {cities.map((loc) => (
                             <Option key={loc.id} value={loc.id}>
                                 {loc.name}
                             </Option>
@@ -458,18 +384,17 @@ const CreateNewTour = () => {
                         value={description}
                         onChange={setDescription}
                         placeholder="Nhập mô tả địa điểm"
-                        // style={{ minHeight: "200px" }}
                         modules={{
                             toolbar: [
-                                [{ header: [1, 2, 3, false] }], // Tiêu đề
-                                ["bold", "italic", "underline", "strike"], // Định dạng chữ
-                                [{ color: [] }, { background: [] }], // Màu chữ và nền
-                                [{ script: "sub" }, { script: "super" }], // Chỉ số trên/dưới
-                                [{ list: "ordered" }, { list: "bullet" }], // Danh sách
-                                [{ align: [] }], // Căn chỉnh
-                                ["link", "image", "video"], // Chèn liên kết, ảnh, video
-                                ["blockquote", "code-block"], // Trích dẫn, khối mã
-                                ["clean"], // Xóa định dạng
+                                [{ header: [1, 2, 3, false] }],
+                                ["bold", "italic", "underline", "strike"],
+                                [{ color: [] }, { background: [] }],
+                                [{ script: "sub" }, { script: "super" }],
+                                [{ list: "ordered" }, { list: "bullet" }],
+                                [{ align: [] }],
+                                ["link", "image", "video"],
+                                ["blockquote", "code-block"],
+                                ["clean"],
                             ],
                         }}
                         formats={[
@@ -504,7 +429,11 @@ const CreateNewTour = () => {
                         <Button htmlType="reset" onClick={() => navigate(-1)}>
                             Hủy
                         </Button>
-                        <Button type="primary" htmlType="submit">
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={loading}
+                        >
                             Tạo tour
                         </Button>
                     </div>
