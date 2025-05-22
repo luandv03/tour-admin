@@ -10,8 +10,14 @@ import {
     message,
     Spin,
     Rate,
+    Flex,
 } from "antd";
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import {
+    DeleteOutlined,
+    EditOutlined,
+    PlusOutlined,
+    PlusCircleOutlined,
+} from "@ant-design/icons";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { useParams } from "react-router-dom";
@@ -34,6 +40,7 @@ const TourDetail = () => {
     const [loading, setLoading] = useState(true);
     const [departureOptions, setDepartureOptions] = useState([]);
     const [touristPlaces, setTouristPlaces] = useState([]);
+    const [expandedDays, setExpandedDays] = useState({});
 
     useEffect(() => {
         const fetchAll = async () => {
@@ -47,6 +54,21 @@ const TourDetail = () => {
                 setDepartureOptions(citiesRes);
                 setTouristPlaces(placesRes);
 
+                // Process itinerary for day-based organization
+                const itinerary = tourRes.tourPlaces.map((place) => ({
+                    id: place.id,
+                    value: place.touristPlace.id,
+                    day: place.day,
+                }));
+
+                // Initialize expanded days
+                const days = [...new Set(itinerary.map((item) => item.day))];
+                const initialExpandedDays = {};
+                days.forEach((day) => {
+                    initialExpandedDays[day] = true;
+                });
+                setExpandedDays(initialExpandedDays);
+
                 // Chuyển đổi dữ liệu từ API về đúng định dạng
                 setTourData({
                     ...tourRes,
@@ -54,11 +76,7 @@ const TourDetail = () => {
                         type: p.passengerTypeName,
                         price: p.price,
                     })),
-                    itinerary: tourRes.tourPlaces.map((place) => ({
-                        id: place.id,
-                        value: place.touristPlace.id,
-                        day: place.day,
-                    })),
+                    itinerary,
                     departurePoint: tourRes.departurePoint,
                     description: tourRes.description,
                 });
@@ -68,11 +86,7 @@ const TourDetail = () => {
                         type: p.passengerTypeName,
                         price: p.price,
                     })),
-                    itinerary: tourRes.tourPlaces.map((place) => ({
-                        id: place.id,
-                        value: place.touristPlace.id,
-                        day: place.day,
-                    })),
+                    itinerary,
                     departurePoint: tourRes.departurePoint,
                     description: tourRes.description,
                 });
@@ -93,16 +107,72 @@ const TourDetail = () => {
         );
     }
 
+    const toggleDayExpansion = (day) => {
+        setExpandedDays((prev) => ({
+            ...prev,
+            [day]: prev[day] === false ? true : false,
+        }));
+    };
+
     const handleAddLocation = () => {
         const newId =
             (newTourData.itinerary.length > 0
                 ? Math.max(...newTourData.itinerary.map((l) => l.id))
                 : 0) + 1;
+
+        // Find the max day number
+        const maxDay = newTourData.itinerary.reduce(
+            (max, loc) => Math.max(max, loc.day || 1),
+            0
+        );
+
         setNewTourData({
             ...newTourData,
             itinerary: [
                 ...newTourData.itinerary,
-                { id: newId, value: null, day: null },
+                { id: newId, value: null, day: maxDay },
+            ],
+        });
+    };
+
+    const addNewDay = () => {
+        // Find the max day number
+        const maxDay = newTourData.itinerary.reduce(
+            (max, loc) => Math.max(max, loc.day || 1),
+            0
+        );
+
+        const newId =
+            (newTourData.itinerary.length > 0
+                ? Math.max(...newTourData.itinerary.map((l) => l.id))
+                : 0) + 1;
+
+        setNewTourData({
+            ...newTourData,
+            itinerary: [
+                ...newTourData.itinerary,
+                { id: newId, value: null, day: maxDay + 1 },
+            ],
+        });
+
+        // Make sure the new day is expanded
+        setExpandedDays((prev) => ({
+            ...prev,
+            [maxDay + 1]: true,
+        }));
+    };
+
+    const handleAddLocationForDay = (day) => {
+        const newId =
+            (newTourData.itinerary.length > 0
+                ? Math.max(...newTourData.itinerary.map((l) => l.id))
+                : 0) + 1;
+
+        setNewTourData({
+            ...newTourData,
+            itinerary: [
+                ...newTourData.itinerary,
+                { id: newId, value: null, day },
             ],
         });
     };
@@ -114,6 +184,21 @@ const TourDetail = () => {
                 (location) => location.id !== id
             ),
         });
+    };
+
+    const handleDeleteDay = (dayToDelete) => {
+        // Remove all locations for this day
+        setNewTourData({
+            ...newTourData,
+            itinerary: newTourData.itinerary.filter(
+                (location) => location.day !== dayToDelete
+            ),
+        });
+
+        // Remove from expanded days state
+        const newExpandedDays = { ...expandedDays };
+        delete newExpandedDays[dayToDelete];
+        setExpandedDays(newExpandedDays);
     };
 
     const handleLocationChange = (id, value) => {
@@ -262,8 +347,8 @@ const TourDetail = () => {
                                               {price.type}
                                           </span>
                                       }
-                                      type="number"
-                                      value={price.price}
+                                      type="text"
+                                      value={price.price.toLocaleString()}
                                       readOnly
                                   />
                               </div>
@@ -273,109 +358,419 @@ const TourDetail = () => {
                 <Form.Item
                     label={<span style={{ fontWeight: "bold" }}>Lộ trình</span>}
                 >
-                    <Steps direction="vertical" current={-1}>
-                        {newTourData.itinerary.map((location) => (
-                            <Step
-                                key={location.id}
-                                title={`Địa điểm ${location.id}`}
-                                status="process"
-                                description={
-                                    <Space
-                                        style={{
-                                            display: "flex",
-                                            marginBottom: 8,
-                                        }}
-                                        align="baseline"
-                                    >
-                                        {isEditing ? (
-                                            <>
-                                                <Select
-                                                    placeholder="Chọn địa điểm"
-                                                    style={{ width: "220px" }}
-                                                    value={location.value}
-                                                    showSearch
-                                                    filterOption={(
-                                                        input,
-                                                        option
-                                                    ) =>
-                                                        option.children
-                                                            .toLowerCase()
-                                                            .includes(
-                                                                input.toLowerCase()
-                                                            )
-                                                    }
-                                                    onChange={(value) =>
-                                                        handleLocationChange(
-                                                            location.id,
-                                                            value
-                                                        )
+                    {isEditing ? (
+                        <div>
+                            {(() => {
+                                // Group locations by day
+                                const days = [
+                                    ...new Set(
+                                        newTourData.itinerary.map(
+                                            (item) => item.day || 1
+                                        )
+                                    ),
+                                ].sort((a, b) => a - b);
+
+                                return days.map((day) => {
+                                    const dayItems =
+                                        newTourData.itinerary.filter(
+                                            (item) => (item.day || 1) === day
+                                        );
+
+                                    // Sort items by their ID to maintain addition order
+                                    dayItems.sort((a, b) => a.id - b.id);
+
+                                    // Use expandedDays state, default to true if not set
+                                    const isExpanded =
+                                        expandedDays[day] !== false;
+
+                                    return (
+                                        <div
+                                            key={`day-${day}`}
+                                            style={{ marginBottom: "15px" }}
+                                        >
+                                            <div
+                                                style={{
+                                                    cursor: "pointer",
+                                                    background: "#f6f6f6",
+                                                    boxShadow:
+                                                        "rgba(99, 99, 99, 0.2) 0px 2px 8px 0px",
+                                                    color: "#004085",
+                                                    marginBottom: "8px",
+                                                    padding: "10px 15px",
+                                                    display: "flex",
+                                                    justifyContent:
+                                                        "space-between",
+                                                    alignItems: "center",
+                                                    borderRadius: "4px",
+                                                }}
+                                            >
+                                                <div
+                                                    onClick={() =>
+                                                        toggleDayExpansion(day)
                                                     }
                                                 >
-                                                    {touristPlaces.map(
-                                                        (place) => (
-                                                            <Option
-                                                                key={place.id}
-                                                                value={place.id}
-                                                            >
-                                                                {
-                                                                    place.placeName
-                                                                }
-                                                            </Option>
-                                                        )
+                                                    <strong>Ngày {day}</strong>
+                                                </div>
+                                                <div>
+                                                    <span
+                                                        onClick={() =>
+                                                            toggleDayExpansion(
+                                                                day
+                                                            )
+                                                        }
+                                                        style={{
+                                                            marginRight: "10px",
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        {isExpanded ? "▼" : "►"}
+                                                    </span>
+                                                    <Button
+                                                        type="text"
+                                                        danger
+                                                        icon={
+                                                            <DeleteOutlined />
+                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteDay(
+                                                                day
+                                                            );
+                                                        }}
+                                                        title="Xóa ngày"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div
+                                                    style={{
+                                                        background: "#f6f6f6",
+                                                        padding: "15px",
+                                                        borderRadius: "5px",
+                                                        marginBottom: "15px",
+                                                        border: "1px solid #d1e6ff",
+                                                        marginLeft: "15px",
+                                                    }}
+                                                >
+                                                    {dayItems.map(
+                                                        (item, itemIndex) => {
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        item.id
+                                                                    }
+                                                                    style={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        marginBottom:
+                                                                            "10px",
+                                                                        position:
+                                                                            "relative",
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            width: "24px",
+                                                                            height: "24px",
+                                                                            borderRadius:
+                                                                                "50%",
+                                                                            backgroundColor:
+                                                                                "#0d6efd",
+                                                                            color: "white",
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            justifyContent:
+                                                                                "center",
+                                                                            marginRight:
+                                                                                "10px",
+                                                                            zIndex: 2,
+                                                                        }}
+                                                                    >
+                                                                        {itemIndex +
+                                                                            1}
+                                                                    </div>
+
+                                                                    {/* Connect line to next item */}
+                                                                    {itemIndex !==
+                                                                        dayItems.length -
+                                                                            1 && (
+                                                                        <div
+                                                                            style={{
+                                                                                position:
+                                                                                    "absolute",
+                                                                                left: "12px",
+                                                                                top: "24px",
+                                                                                height: "30px",
+                                                                                width: "2px",
+                                                                                backgroundColor:
+                                                                                    "#0d6efd",
+                                                                                zIndex: 1,
+                                                                            }}
+                                                                        />
+                                                                    )}
+
+                                                                    <Select
+                                                                        placeholder="--- Chọn địa điểm ---"
+                                                                        style={{
+                                                                            width: "240px",
+                                                                            marginRight:
+                                                                                "10px",
+                                                                        }}
+                                                                        value={
+                                                                            item.value
+                                                                        }
+                                                                        showSearch
+                                                                        filterOption={(
+                                                                            input,
+                                                                            option
+                                                                        ) =>
+                                                                            option.children
+                                                                                .toLowerCase()
+                                                                                .includes(
+                                                                                    input.toLowerCase()
+                                                                                )
+                                                                        }
+                                                                        onChange={(
+                                                                            value
+                                                                        ) =>
+                                                                            handleLocationChange(
+                                                                                item.id,
+                                                                                value
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {touristPlaces.map(
+                                                                            (
+                                                                                loc
+                                                                            ) => (
+                                                                                <Option
+                                                                                    key={
+                                                                                        loc.id
+                                                                                    }
+                                                                                    value={
+                                                                                        loc.id
+                                                                                    }
+                                                                                >
+                                                                                    {
+                                                                                        loc.placeName
+                                                                                    }
+                                                                                </Option>
+                                                                            )
+                                                                        )}
+                                                                    </Select>
+
+                                                                    <Button
+                                                                        type="text"
+                                                                        danger
+                                                                        icon={
+                                                                            <DeleteOutlined />
+                                                                        }
+                                                                        onClick={() =>
+                                                                            handleRemoveLocation(
+                                                                                item.id
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        }
                                                     )}
-                                                </Select>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Ngày thứ mấy"
-                                                    style={{ width: "100px" }}
-                                                    value={location.day}
-                                                    onChange={(e) =>
-                                                        handleDayChange(
-                                                            location.id,
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    min={1}
-                                                    max={100}
-                                                />
-                                                <Button
-                                                    icon={<DeleteOutlined />}
-                                                    danger
-                                                    onClick={() =>
-                                                        handleRemoveLocation(
-                                                            location.id
-                                                        )
-                                                    }
-                                                />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span>
-                                                    {touristPlaces.find(
-                                                        (p) =>
-                                                            p.id ===
-                                                            location.value
-                                                    )?.placeName ||
-                                                        location.value}
+
+                                                    <div
+                                                        onClick={() =>
+                                                            handleAddLocationForDay(
+                                                                day
+                                                            )
+                                                        }
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            color: "#004085",
+                                                            cursor: "pointer",
+                                                            marginLeft: "20px",
+                                                            marginTop: "15px",
+                                                        }}
+                                                    >
+                                                        <PlusCircleOutlined
+                                                            style={{
+                                                                marginRight: 8,
+                                                            }}
+                                                        />
+                                                        <span>
+                                                            Thêm địa điểm
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
+
+                            <Button
+                                type="primary"
+                                ghost
+                                onClick={addNewDay}
+                                icon={<PlusOutlined />}
+                                style={{ marginTop: "10px" }}
+                            >
+                                Thêm ngày mới
+                            </Button>
+                        </div>
+                    ) : (
+                        <div>
+                            {(() => {
+                                // Group locations by day for display mode
+                                const days = [
+                                    ...new Set(
+                                        tourData.itinerary.map(
+                                            (item) => item.day || 1
+                                        )
+                                    ),
+                                ].sort((a, b) => a - b);
+
+                                return days.map((day) => {
+                                    const dayItems = tourData.itinerary.filter(
+                                        (item) => (item.day || 1) === day
+                                    );
+                                    // Use expandedDays state, default to true if not set
+                                    const isExpanded =
+                                        expandedDays[day] !== false;
+
+                                    return (
+                                        <div
+                                            key={`day-${day}`}
+                                            style={{ marginBottom: "15px" }}
+                                        >
+                                            <div
+                                                style={{
+                                                    cursor: "pointer",
+                                                    background: "#f6f6f6",
+                                                    boxShadow:
+                                                        "rgba(99, 99, 99, 0.2) 0px 2px 8px 0px",
+                                                    color: "#004085",
+                                                    marginBottom: "8px",
+                                                    padding: "10px 15px",
+                                                    display: "flex",
+                                                    justifyContent:
+                                                        "space-between",
+                                                    alignItems: "center",
+                                                    borderRadius: "4px",
+                                                }}
+                                                onClick={() =>
+                                                    toggleDayExpansion(day)
+                                                }
+                                            >
+                                                <strong>Ngày {day}</strong>
+                                                <span
+                                                    style={{
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    {isExpanded ? "▼" : "►"}
                                                 </span>
-                                                <span>
-                                                    Ngày: {location.day}
-                                                </span>
-                                            </>
-                                        )}
-                                    </Space>
-                                }
-                            />
-                        ))}
-                    </Steps>
-                    {isEditing && (
-                        <Button
-                            type="dashed"
-                            onClick={handleAddLocation}
-                            style={{ marginTop: "16px" }}
-                        >
-                            + Thêm địa điểm
-                        </Button>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div
+                                                    style={{
+                                                        background: "#f6f6f6",
+                                                        padding: "15px",
+                                                        borderRadius: "5px",
+                                                        marginBottom: "15px",
+                                                        border: "1px solid #d1e6ff",
+                                                        marginLeft: "15px",
+                                                    }}
+                                                >
+                                                    {dayItems.map(
+                                                        (item, itemIndex) => {
+                                                            const place =
+                                                                touristPlaces.find(
+                                                                    (p) =>
+                                                                        p.id ===
+                                                                        item.value
+                                                                );
+
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        item.id
+                                                                    }
+                                                                    style={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        marginBottom:
+                                                                            "10px",
+                                                                        position:
+                                                                            "relative",
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            width: "24px",
+                                                                            height: "24px",
+                                                                            borderRadius:
+                                                                                "50%",
+                                                                            backgroundColor:
+                                                                                "#0d6efd",
+                                                                            color: "white",
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            justifyContent:
+                                                                                "center",
+                                                                            marginRight:
+                                                                                "10px",
+                                                                            zIndex: 2,
+                                                                        }}
+                                                                    >
+                                                                        {itemIndex +
+                                                                            1}
+                                                                    </div>
+
+                                                                    {/* Connect line to next item */}
+                                                                    {itemIndex !==
+                                                                        dayItems.length -
+                                                                            1 && (
+                                                                        <div
+                                                                            style={{
+                                                                                position:
+                                                                                    "absolute",
+                                                                                left: "12px",
+                                                                                top: "24px",
+                                                                                height: "30px",
+                                                                                width: "2px",
+                                                                                backgroundColor:
+                                                                                    "#0d6efd",
+                                                                                zIndex: 1,
+                                                                            }}
+                                                                        />
+                                                                    )}
+
+                                                                    <span>
+                                                                        {place?.placeName ||
+                                                                            "Không xác định"}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
                     )}
                 </Form.Item>
 
@@ -420,6 +815,19 @@ const TourDetail = () => {
                             value={description}
                             onChange={setDescription}
                             placeholder="Nhập mô tả địa điểm"
+                            modules={{
+                                toolbar: [
+                                    [{ header: [1, 2, 3, false] }],
+                                    ["bold", "italic", "underline", "strike"],
+                                    [{ color: [] }, { background: [] }],
+                                    [{ script: "sub" }, { script: "super" }],
+                                    [{ list: "ordered" }, { list: "bullet" }],
+                                    [{ align: [] }],
+                                    ["link", "image", "video"],
+                                    ["blockquote", "code-block"],
+                                    ["clean"],
+                                ],
+                            }}
                         />
                     ) : (
                         <div

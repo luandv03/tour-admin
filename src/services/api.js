@@ -110,11 +110,19 @@ export const fetchTourBookingDetail = async (bookingId) => {
     }
 };
 
+export const fetchTouristPlaceById = async (id) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/tourist-places/${id}`);
+        return response.data; // Trả về chi tiết địa điểm du lịch từ API
+    } catch (error) {
+        console.error(`Error fetching tourist place with id ${id}:`, error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};
+
 export const fetchAllTourBookings = async () => {
     try {
-        const response = await axios.get(
-            "http://localhost:8080/api/tour-bookings"
-        );
+        const response = await axios.get(`${BASE_URL}/tour-bookings`);
         return response.data; // Trả về danh sách tất cả tour booking từ API
     } catch (error) {
         console.error("Error fetching all tour bookings:", error);

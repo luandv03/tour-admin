@@ -29,8 +29,8 @@ const items = [
         // getItem("Tour khách hàng yêu cầu", "4", null, "/customer-tours"),
         getItem("Tour booking", "5", null, "/tours-booking"),
     ]),
-    getItem("Quản lý khách hàng", "6", <TeamOutlined />, "/customers"),
-    getItem("Quản lý tài khoản", "7", <UserOutlined />, "/accounts"),
+    // getItem("Quản lý khách hàng", "6", <TeamOutlined />, "/customers"),
+    // getItem("Quản lý tài khoản", "7", <UserOutlined />, "/accounts"),
 ];
 const MainLayout = () => {
     const [collapsed, setCollapsed] = useState(false);
@@ -119,19 +119,16 @@ const MainLayout = () => {
                     <Dropdown overlay={userMenu} trigger={["hover"]}>
                         <Space style={{ cursor: "pointer" }}>
                             <Avatar size="large" icon={<UserOutlined />} />
-                            <span>Luan dinh</span>
+                            <span>Đức Phú</span>
                             <DownOutlined />
                         </Space>
                     </Dropdown>
                 </Header>
                 <Content style={{ margin: "0 16px" }}>
-                    <Breadcrumb style={{ margin: "16px 0" }}>
-                        <Breadcrumb.Item>User</Breadcrumb.Item>
-                        <Breadcrumb.Item>Bill</Breadcrumb.Item>
-                    </Breadcrumb>
                     <div
                         style={{
                             padding: 24,
+                            marginTop: 24,
                             minHeight: 360,
                             background: colorBgContainer,
                             borderRadius: borderRadiusLG,

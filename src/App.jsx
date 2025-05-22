@@ -28,7 +28,7 @@ function App() {
                     />
 
                     <Route
-                        path="/manage-places/:touristPlaceId"
+                        path="/manage-places/:placeId"
                         element={<TouristPlaceDetail />}
                     />
 

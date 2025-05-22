@@ -203,9 +203,13 @@ const TourBookingManagement = () => {
                         onChange={(value) => setFilterStatus(value)}
                     >
                         <Option value="">Tất cả</Option>
-                        <Option value="Chờ xác nhận">Chờ xác nhận</Option>
-                        <Option value="Đã xác nhận">Đã xác nhận</Option>
-                        <Option value="Đã thanh toán">Đã thanh toán</Option>
+                        {Object.entries(STATUS_BOOKING_ENUM).map(
+                            ([key, value]) => (
+                                <Option key={key} value={value}>
+                                    {value}
+                                </Option>
+                            )
+                        )}
                     </Select>
                 </div>
             </Modal>

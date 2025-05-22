@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import {
     Descriptions,
     Form,
@@ -14,6 +15,7 @@ import {
     message,
     List,
     Flex,
+    Spin,
 } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import ReactQuill from "react-quill-new";
@@ -26,41 +28,20 @@ import {
     useMapEvents,
     useMap,
 } from "react-leaflet";
+import { fetchTouristPlaceById } from "../services/api";
 
 const { Paragraph } = Typography;
 const { Title } = Typography;
 const { Option } = Select;
 
-const TouristPlaceDetail = ({ touristPlace }) => {
+const TouristPlaceDetail = () => {
+    const { placeId } = useParams();
     const [isEditing, setIsEditing] = useState(false);
-    const [place, setPlace] = useState(
-        touristPlace || {
-            name: "Vịnh Hạ Long",
-            type: "Bãi biển",
-            description:
-                "Vịnh Hạ Long là một trong những kỳ quan thiên nhiên thế giới.",
-            address: "Quảng Ninh, Việt Nam",
-            latitude: "20.9673073",
-            longitude: "106.8868135",
-            ticketPrice: "200,000 VNĐ",
-            images: [
-                "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT6fX7LS2Vtr0dLqd6X1e1KarnYoBNKI5YEpA&s",
-                "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSH8HIJQLisCt5na1f5gEdON2g0ha4RTN1eDQ&s",
-            ],
-            startHour: "8:00 AM",
-            endHour: "5:00 PM",
-        }
-    );
-    const [newPlace, setNewPlace] = useState(place);
-    const [fileList, setFileList] = useState(
-        place.images.map((url, index) => ({
-            uid: index,
-            name: `Hình ảnh ${index + 1}`,
-            status: "done",
-            url,
-        }))
-    );
-    const [description, setDescription] = useState(place.description);
+    const [loading, setLoading] = useState(true);
+    const [place, setPlace] = useState(null);
+    const [newPlace, setNewPlace] = useState(null);
+    const [fileList, setFileList] = useState([]);
+    const [description, setDescription] = useState("");
     const [previewVisible, setPreviewVisible] = useState(false);
     const [previewImage, setPreviewImage] = useState("");
 
@@ -74,6 +55,61 @@ const TouristPlaceDetail = ({ touristPlace }) => {
         longitude: null,
         address: "",
     });
+
+    // Fetch tourist place data
+    useEffect(() => {
+        const fetchPlaceData = async () => {
+            setLoading(true);
+            try {
+                const data = await fetchTouristPlaceById(placeId);
+
+                // Process the data
+                const placeData = {
+                    id: data.id,
+                    name: data.placeName,
+                    type: data.placeType?.name || "Không xác định",
+                    description: data.description || "",
+                    address: data.address || "",
+                    latitude: data.latitude || "0",
+                    longitude: data.longitude || "0",
+                    images: data.images?.map((img) => img.imageUrl) || [],
+                    city: data.city?.name || "Không xác định",
+                };
+
+                setPlace(placeData);
+                setNewPlace(placeData);
+                setDescription(placeData.description);
+
+                // Setup file list for image upload component
+                if (data.images && data.images.length > 0) {
+                    setFileList(
+                        data.images.map((img, index) => ({
+                            uid: img.id || index,
+                            name: `Hình ảnh ${index + 1}`,
+                            status: "done",
+                            url: img.imageUrl,
+                        }))
+                    );
+                }
+            } catch (error) {
+                message.error("Không thể tải thông tin địa điểm!");
+                console.error("Error fetching place details:", error);
+            }
+            setLoading(false);
+        };
+
+        if (placeId) {
+            fetchPlaceData();
+        }
+    }, [placeId]);
+
+    if (loading || !place) {
+        return (
+            <div style={{ padding: 48, textAlign: "center" }}>
+                <Spin size="large" />
+            </div>
+        );
+    }
 
     const handleUploadChange = ({ fileList: newFileList }) => {
         setFileList(newFileList);
@@ -210,10 +246,10 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                         }
                         style={{ width: "200px" }}
                     >
+                        <Option value="Di tích lịch sử">Di tích lịch sử</Option>
                         <Option value="Bãi biển">Bãi biển</Option>
                         <Option value="Chùa chiền">Chùa chiền</Option>
                         <Option value="Núi">Núi</Option>
-                        <Option value="Di tích lịch sử">Di tích lịch sử</Option>
                     </Select>
                 ) : (
                     place.type
@@ -265,7 +301,7 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                             <div
                                 dangerouslySetInnerHTML={{
                                     __html: newPlace.description,
-                                }} // Hiển thị nội dung HTML an toàn
+                                }}
                             />
                             <Button
                                 type="link"
@@ -279,7 +315,7 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                         <div
                             dangerouslySetInnerHTML={{
                                 __html: place.description,
-                            }} // Hiển thị nội dung HTML an toàn
+                            }}
                         />
                     )}
                 </Descriptions.Item>
@@ -301,59 +337,32 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                         place.address
                     )}
                 </Descriptions.Item>
-                <Descriptions.Item label="Giá vé">
-                    {isEditing ? (
-                        <Input
-                            defaultValue={newPlace.ticketPrice}
-                            onChange={(e) =>
-                                setNewPlace({
-                                    ...newPlace,
-                                    ticketPrice: e.target.value,
-                                })
-                            }
-                        />
-                    ) : (
-                        place.ticketPrice
-                    )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Giờ mở cửa">
-                    {isEditing ? (
-                        <>
-                            <TimePicker
-                                defaultValue={moment(
-                                    newPlace.startHour,
-                                    "h:mm A"
-                                )}
-                                format="h:mm A"
-                                onChange={(time) => {
-                                    console.log(time.format("h:mm A"));
-                                    setNewPlace({
-                                        ...newPlace,
-                                        startHour: time.format("h:mm A"),
-                                    });
-                                }}
-                            />{" "}
-                            -{" "}
-                            <TimePicker
-                                defaultValue={moment(
-                                    newPlace.endHour,
-                                    "h:mm A"
-                                )}
-                                format="h:mm A"
-                                onChange={(time) => {
-                                    console.log(time.format("h:mm A"));
-                                    setNewPlace({
-                                        ...newPlace,
-                                        endHour: time.format("h:mm A"),
-                                    });
-                                }}
-                            />
-                        </>
-                    ) : (
-                        `${place.startHour} - ${place.endHour}`
-                    )}
+                <Descriptions.Item label="Thành phố">
+                    {place.city}
                 </Descriptions.Item>
             </Descriptions>
+
+            <Divider />
+
+            <Title level={4}>Bản đồ</Title>
+            <div style={{ height: "400px", width: "100%" }}>
+                <MapContainer
+                    center={[Number(place.latitude), Number(place.longitude)]}
+                    zoom={14}
+                    style={{ width: "100%", height: "100%" }}
+                >
+                    <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    <Marker
+                        position={[
+                            Number(place.latitude),
+                            Number(place.longitude),
+                        ]}
+                    />
+                </MapContainer>
+            </div>
 
             {/* Modal chỉnh sửa mô tả */}
             <Modal
@@ -400,13 +409,13 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                                     </List.Item>
                                 )}
                                 style={{
-                                    position: "absolute", // Đặt danh sách ở vị trí tuyệt đối
-                                    top: "40px", // Đẩy danh sách xuống dưới ô tìm kiếm
+                                    position: "absolute",
+                                    top: "40px",
                                     left: 0,
                                     right: 0,
-                                    zIndex: 1500, // Đảm bảo danh sách nằm trên các phần tử khác
-                                    backgroundColor: "white", // Đặt nền trắng để che các phần tử bên dưới
-                                    border: "1px solid #d9d9d9", // Viền giống với Ant Design
+                                    zIndex: 1500,
+                                    backgroundColor: "white",
+                                    border: "1px solid #d9d9d9",
                                     borderRadius: "4px",
                                     maxHeight: "200px",
                                     overflowY: "auto",
@@ -424,7 +433,10 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                             }}
                         >
                             <MapContainer
-                                center={[21.028511, 105.804817]} // Tọa độ mặc định (Hà Nội)
+                                center={[
+                                    Number(newPlace.latitude) || 21.028511,
+                                    Number(newPlace.longitude) || 105.804817,
+                                ]}
                                 zoom={13}
                                 style={{ width: "100%", height: "100%" }}
                             >
@@ -437,8 +449,8 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                                 {newPlace.latitude && newPlace.longitude && (
                                     <Marker
                                         position={[
-                                            newPlace.latitude,
-                                            newPlace.longitude,
+                                            Number(newPlace.latitude),
+                                            Number(newPlace.longitude),
                                         ]}
                                     />
                                 )}
@@ -459,10 +471,11 @@ const TouristPlaceDetail = ({ touristPlace }) => {
                             onClick={() => {
                                 setIsAddressModalVisible(false);
                                 setNewPlace({
-                                    ...place,
+                                    ...newPlace,
                                     latitude: place.latitude,
                                     longitude: place.longitude,
-                                }); // Đặt lại newPlace về giá trị ban đầu
+                                    address: place.address,
+                                });
                             }}
                             style={{ marginRight: "8px" }}
                         >

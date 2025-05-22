@@ -132,12 +132,7 @@ const CreateNewTour = () => {
     };
 
     const handleAddLocationForDay = (day) => {
-        // Find the max order in the current day
-        const dayLocations = locations.filter(
-            (location) => location.day === day
-        );
-
-        setLocations([...locations, { id: locationId, value: null, day: day }]);
+        setLocations([...locations, { id: locationId, value: null, day }]);
         setLocationId(locationId + 1);
     };
 
@@ -155,31 +150,14 @@ const CreateNewTour = () => {
     };
 
     const handleSubmit = async (values) => {
-        // Chuẩn hóa tourPlaces - fix the ordering logic
-        const tourPlaces = [];
-
-        // Group locations by day
-        const locationsByDay = {};
-        locations
-            .filter((loc) => loc.value)
-            .forEach((loc) => {
-                const day = loc.day || 1;
-                if (!locationsByDay[day]) {
-                    locationsByDay[day] = [];
-                }
-                locationsByDay[day].push(loc);
-            });
-
-        // Create ordered tourPlaces array
-        Object.keys(locationsByDay).forEach((day) => {
-            locationsByDay[day].forEach((location, index) => {
-                tourPlaces.push({
-                    touristPlaceId: location.value,
-                    day: parseInt(day, 10),
-                    orderInDay: index + 1,
-                });
-            });
-        });
+        // Chuẩn hóa tourPlaces
+        const tourPlaces = locations
+            .filter((location) => location.value)
+            .map((location, idx) => ({
+                touristPlaceId: location.value,
+                day: location.day || 1,
+                orderInDay: idx + 1,
+            }));
 
         console.log(prices);
 
@@ -215,10 +193,6 @@ const CreateNewTour = () => {
             tourPlaces,
             passengerPrices,
         };
-
-        console.log(body);
-
-        return;
 
         setLoading(true);
         try {
@@ -312,9 +286,6 @@ const CreateNewTour = () => {
                                 const dayItems = locations.filter(
                                     (item) => (item.day || 1) === day
                                 );
-                                // Sort items by their ID to maintain addition order
-                                dayItems.sort((a, b) => a.id - b.id);
-
                                 // Use expandedDays state, default to true if not set
                                 const isExpanded = expandedDays[day] !== false;
 
