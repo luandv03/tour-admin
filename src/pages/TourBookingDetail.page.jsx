@@ -9,9 +9,12 @@ import {
     Input,
     Spin,
     message,
+    Button,
+    notification,
 } from "antd";
-import { useParams } from "react-router-dom";
-import { fetchTourBookingDetail } from "../services/api";
+import { Link, useParams } from "react-router-dom";
+import { fetchTourBookingDetail, confirmBooking } from "../services/api";
+import { STATUS_BOOKING_ENUM } from "../utils/statusBooking";
 
 const { Title } = Typography;
 
@@ -19,6 +22,7 @@ const TourBookingDetail = () => {
     const { tourBookingId } = useParams();
     const [bookingData, setBookingData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [statusBokingLoading, setStatusBookingLoading] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -43,6 +47,7 @@ const TourBookingDetail = () => {
                         type: res.tour.isCustom ? "Cá nhân" : "Doanh nghiệp",
                     },
                     customer: {
+                        userId: res.user?.userId,
                         name: res.user?.name,
                         email: res.user?.email,
                         phone: res.user?.phoneNumber,
@@ -85,14 +90,44 @@ const TourBookingDetail = () => {
         fetchData();
     }, [tourBookingId]);
 
-    const handleStatusChange = (checked) => {
-        setBookingData((prevData) => ({
-            ...prevData,
-            booking: {
-                ...prevData.booking,
-                status: checked ? "Đã xác nhận" : "Chờ xác nhận",
-            },
-        }));
+    const handleStatusChange = async () => {
+        // notification.open({
+        //     message: "Sample-Notification-Title",
+        //     description: "Sample Notification Description",
+        // });
+
+        // return;
+
+        if (bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU") {
+            try {
+                setStatusBookingLoading(true);
+                const res = await confirmBooking(bookingData.booking.id);
+                setStatusBookingLoading(false);
+                if (res) {
+                    message.success("Xác nhận booking thành công!");
+                    setBookingData((prevData) => ({
+                        ...prevData,
+                        booking: {
+                            ...prevData.booking,
+                            status: res?.status,
+                        },
+                    }));
+                } else {
+                    message.error("Xác nhận booking thất bại!");
+                }
+                return;
+            } catch (error) {
+                setStatusBookingLoading(false);
+                message.error("Xác nhận booking không thành công!");
+            }
+        }
+        // setBookingData((prevData) => ({
+        //     ...prevData,
+        //     booking: {
+        //         ...prevData.booking,
+        //         status: checked ? "Đã xác nhận" : "Chờ xác nhận",
+        //     },
+        // }));
     };
 
     if (loading || !bookingData) {
@@ -113,7 +148,9 @@ const TourBookingDetail = () => {
             <Title level={4}>Thông tin về tour</Title>
             <Descriptions bordered column={1}>
                 <Descriptions.Item label="Mã tour">
-                    {bookingData.tour.id}
+                    <Link to={`/tours/${bookingData.tour.id}`}>
+                        {bookingData.tour.id}
+                    </Link>
                 </Descriptions.Item>
                 <Descriptions.Item label="Tên tour">
                     {bookingData.tour.name}
@@ -145,6 +182,9 @@ const TourBookingDetail = () => {
             {/* Thông tin khách hàng */}
             <Title level={4}>Thông tin khách hàng</Title>
             <Descriptions bordered column={1}>
+                <Descriptions.Item label="Mã khách hàng">
+                    {bookingData.customer.userId}
+                </Descriptions.Item>
                 <Descriptions.Item label="Tên khách hàng">
                     {bookingData.customer.name}
                 </Descriptions.Item>
@@ -218,14 +258,20 @@ const TourBookingDetail = () => {
                     )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">
-                    <span>{bookingData.booking.status}</span>
-                    <Switch
-                        checked={bookingData.booking.status === "Đã xác nhận"}
-                        onChange={handleStatusChange}
-                        style={{ marginLeft: "16px" }}
-                    >
-                        Xác nhận
-                    </Switch>
+                    <span>
+                        {STATUS_BOOKING_ENUM[bookingData.booking.status]}
+                    </span>
+
+                    {bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU" && (
+                        <Button
+                            style={{ marginLeft: "16px", minWidth: "120px" }}
+                            type="primary"
+                            onClick={() => handleStatusChange()}
+                            loading={statusBokingLoading}
+                        >
+                            Xác nhận
+                        </Button>
+                    )}
                 </Descriptions.Item>
             </Descriptions>
         </div>

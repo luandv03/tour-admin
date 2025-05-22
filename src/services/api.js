@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8080/api";
+const BASE_URL = "https://tour-server-d14k.onrender.com/api";
 
 export const fetchTours = async () => {
     try {
@@ -118,6 +118,30 @@ export const fetchAllTourBookings = async () => {
         return response.data; // Trả về danh sách tất cả tour booking từ API
     } catch (error) {
         console.error("Error fetching all tour bookings:", error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};
+
+export const confirmBooking = async (bookingId) => {
+    try {
+        const response = await axios.put(
+            `${BASE_URL}/tour-bookings/confirm/${bookingId}`
+        );
+        return response.data; // Trả về dữ liệu booking đã xác nhận từ API
+    } catch (error) {
+        console.error("Error confirming booking:", error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};
+
+export const confirmCustomerBooking = async (bookingId) => {
+    try {
+        const response = await axios.put(
+            `${BASE_URL}/tour-bookings/confirm-customer/${bookingId}`
+        );
+        return response.data; // Trả về dữ liệu booking đã xác nhận từ API
+    } catch (error) {
+        console.error("Error confirming customer booking:", error);
         throw error; // Ném lỗi để xử lý ở nơi gọi hàm
     }
 };

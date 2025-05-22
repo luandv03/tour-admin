@@ -12,6 +12,7 @@ import {
 } from "antd";
 import { EyeOutlined, DeleteOutlined, FilterOutlined } from "@ant-design/icons";
 import { bookTour, fetchAllTourBookings } from "../services/api";
+import { STATUS_BOOKING_ENUM } from "../utils/statusBooking";
 
 const { Option } = Select;
 
@@ -41,14 +42,7 @@ const TourBookingManagement = () => {
                         0
                     ),
                     type: item.tour?.isCustom ? "Cá nhân" : "Doanh nghiệp",
-                    status:
-                        item.status === "DA_THANH_TOAN"
-                            ? "Đã thanh toán"
-                            : item.status === "CHO_XAC_NHAN"
-                            ? "Chờ xác nhận"
-                            : item.status === "DA_XAC_NHAN"
-                            ? "Đã xác nhận"
-                            : item.status,
+                    status: STATUS_BOOKING_ENUM[item.status],
                 }));
                 setDataSource(data);
                 setFilteredData(data);
