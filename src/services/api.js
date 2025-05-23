@@ -43,12 +43,35 @@ export const fetchPassengerTypes = async () => {
     }
 };
 
+export const createTouristPlace = async (placeData) => {
+    try {
+        const response = await axios.post(
+            `${BASE_URL}/tourist-places`,
+            placeData
+        );
+        return response.data; // Trả về dữ liệu địa điểm du lịch vừa tạo từ API
+    } catch (error) {
+        console.error("Error creating tourist place:", error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};
+
 export const createTour = async (tourData) => {
     try {
         const response = await axios.post(`${BASE_URL}/tours`, tourData);
         return response.data; // Trả về dữ liệu tour vừa tạo từ API
     } catch (error) {
         console.error("Error creating tour:", error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};
+
+export const fetchPlaceTypes = async () => {
+    try {
+        const response = await axios.get(`${BASE_URL}/place-types`);
+        return response.data; // Trả về danh sách loại địa điểm từ API
+    } catch (error) {
+        console.error("Error fetching place types:", error);
         throw error; // Ném lỗi để xử lý ở nơi gọi hàm
     }
 };
