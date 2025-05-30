@@ -11,9 +11,15 @@ import {
     message,
     Button,
     notification,
+    Modal,
+    Space,
 } from "antd";
 import { Link, useParams } from "react-router-dom";
-import { fetchTourBookingDetail, confirmBooking } from "../services/api";
+import {
+    fetchTourBookingDetail,
+    confirmBooking,
+    confirmCustomBooking,
+} from "../services/api";
 import { STATUS_BOOKING_ENUM } from "../utils/statusBooking";
 
 const { Title } = Typography;
@@ -23,6 +29,8 @@ const TourBookingDetail = () => {
     const [bookingData, setBookingData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [statusBokingLoading, setStatusBookingLoading] = useState(false);
+    const [isEditingPrices, setIsEditingPrices] = useState(false);
+    const [editedPrices, setEditedPrices] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -37,6 +45,7 @@ const TourBookingDetail = () => {
                         prices: res.tour.tourPassengers.map((p) => ({
                             type: p.passengerTypeName,
                             price: p.price,
+                            tourPassengerId: p.id,
                         })),
                         itinerary: res.tour.tourPlaces.map((place) => ({
                             id: place.id,
@@ -45,6 +54,7 @@ const TourBookingDetail = () => {
                         })),
                         departurePoint: res.tour.departurePoint,
                         type: res.tour.isCustom ? "Cá nhân" : "Doanh nghiệp",
+                        isCustom: res.tour.isCustom,
                     },
                     customer: {
                         userId: res.user?.userId,
@@ -82,6 +92,14 @@ const TourBookingDetail = () => {
                         payments: res.payments || [],
                     },
                 });
+
+                // Initialize edited prices
+                setEditedPrices(
+                    res.tour.tourPassengers.map((p) => ({
+                        tourPassengerId: p.id,
+                        price: p.price,
+                    }))
+                );
             } catch (err) {
                 message.error("Không thể tải chi tiết booking!");
             }
@@ -90,44 +108,76 @@ const TourBookingDetail = () => {
         fetchData();
     }, [tourBookingId]);
 
+    const handlePriceChange = (id, value) => {
+        setEditedPrices((prev) =>
+            prev.map((p) =>
+                p.tourPassengerId === id ? { ...p, price: Number(value) } : p
+            )
+        );
+    };
+
     const handleStatusChange = async () => {
-        // notification.open({
-        //     message: "Sample-Notification-Title",
-        //     description: "Sample Notification Description",
-        // });
+        if (!bookingData) return;
 
-        // return;
+        setStatusBookingLoading(true);
 
-        if (bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU") {
-            try {
-                setStatusBookingLoading(true);
-                const res = await confirmBooking(bookingData.booking.id);
-                setStatusBookingLoading(false);
-                if (res) {
-                    message.success("Xác nhận booking thành công!");
-                    setBookingData((prevData) => ({
-                        ...prevData,
-                        booking: {
-                            ...prevData.booking,
-                            status: res?.status,
-                        },
-                    }));
-                } else {
-                    message.error("Xác nhận booking thất bại!");
-                }
-                return;
-            } catch (error) {
-                setStatusBookingLoading(false);
-                message.error("Xác nhận booking không thành công!");
+        try {
+            // Nếu là tour tùy chỉnh và đang ở trạng thái chờ xác nhận yêu cầu
+            if (
+                bookingData.tour.isCustom &&
+                bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU"
+            ) {
+                // Confirm và cập nhật giá
+                const res = await confirmCustomBooking(tourBookingId, {
+                    passengerPrices: editedPrices,
+                });
+
+                message.success("Đã cập nhật giá và xác nhận tour thành công!");
+                setIsEditingPrices(false);
+
+                // Cập nhật lại state với dữ liệu mới
+                setBookingData((prev) => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        status: res.status,
+                        totalPrice: res.totalAmount,
+                        totalPriceAfterDiscount:
+                            res.totalAmount -
+                            (res.totalAmount * (prev.booking.discount || 0)) /
+                                100,
+                    },
+                    tour: {
+                        ...prev.tour,
+                        prices: prev.tour.prices.map((p) => {
+                            const updatedPrice = editedPrices.find(
+                                (ep) => ep.tourPassengerId === p.tourPassengerId
+                            );
+                            return updatedPrice
+                                ? { ...p, price: updatedPrice.price }
+                                : p;
+                        }),
+                    },
+                }));
+            } else if (bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU") {
+                // Xác nhận yêu cầu booking thông thường
+                const res = await confirmBooking(tourBookingId);
+                message.success("Xác nhận booking thành công!");
+
+                setBookingData((prev) => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        status: res?.status,
+                    },
+                }));
             }
+        } catch (error) {
+            console.error("Error updating booking:", error);
+            message.error("Xác nhận booking không thành công!");
+        } finally {
+            setStatusBookingLoading(false);
         }
-        // setBookingData((prevData) => ({
-        //     ...prevData,
-        //     booking: {
-        //         ...prevData.booking,
-        //         status: checked ? "Đã xác nhận" : "Chờ xác nhận",
-        //     },
-        // }));
     };
 
     if (loading || !bookingData) {
@@ -137,6 +187,10 @@ const TourBookingDetail = () => {
             </div>
         );
     }
+
+    const isCustomTourPendingConfirmation =
+        bookingData.tour.isCustom &&
+        bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU";
 
     return (
         <div style={{ padding: "24px" }}>
@@ -169,11 +223,35 @@ const TourBookingDetail = () => {
                     ))}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giá tour (VNĐ)">
-                    {bookingData.tour.prices.map((price, index) => (
-                        <div key={index}>
-                            {price.type}: {price.price.toLocaleString()} VNĐ
-                        </div>
-                    ))}
+                    {isEditingPrices ? (
+                        <>
+                            {bookingData.tour.prices.map((price) => (
+                                <div
+                                    key={price.tourPassengerId}
+                                    style={{ marginBottom: 8 }}
+                                >
+                                    <Input
+                                        addonBefore={price.type}
+                                        type="number"
+                                        defaultValue={price.price}
+                                        onChange={(e) =>
+                                            handlePriceChange(
+                                                price.tourPassengerId,
+                                                e.target.value
+                                            )
+                                        }
+                                        style={{ width: 300 }}
+                                    />
+                                </div>
+                            ))}
+                        </>
+                    ) : (
+                        bookingData.tour.prices.map((price, index) => (
+                            <div key={index}>
+                                {price.type}: {price.price.toLocaleString()} VNĐ
+                            </div>
+                        ))
+                    )}
                 </Descriptions.Item>
             </Descriptions>
 
@@ -263,14 +341,50 @@ const TourBookingDetail = () => {
                     </span>
 
                     {bookingData.booking.status === "CHO_XAC_NHAN_YEU_CAU" && (
-                        <Button
-                            style={{ marginLeft: "16px", minWidth: "120px" }}
-                            type="primary"
-                            onClick={() => handleStatusChange()}
-                            loading={statusBokingLoading}
-                        >
-                            Xác nhận
-                        </Button>
+                        <>
+                            {isCustomTourPendingConfirmation &&
+                            !isEditingPrices ? (
+                                <Button
+                                    style={{
+                                        marginLeft: "16px",
+                                        minWidth: "120px",
+                                    }}
+                                    type="primary"
+                                    onClick={() => setIsEditingPrices(true)}
+                                >
+                                    Cập nhật giá
+                                </Button>
+                            ) : isEditingPrices ? (
+                                <Space style={{ marginLeft: "16px" }}>
+                                    <Button
+                                        onClick={() =>
+                                            setIsEditingPrices(false)
+                                        }
+                                    >
+                                        Hủy
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        onClick={handleStatusChange}
+                                        loading={statusBokingLoading}
+                                    >
+                                        Lưu và xác nhận
+                                    </Button>
+                                </Space>
+                            ) : (
+                                <Button
+                                    style={{
+                                        marginLeft: "16px",
+                                        minWidth: "120px",
+                                    }}
+                                    type="primary"
+                                    onClick={handleStatusChange}
+                                    loading={statusBokingLoading}
+                                >
+                                    Xác nhận
+                                </Button>
+                            )}
+                        </>
                     )}
                 </Descriptions.Item>
             </Descriptions>

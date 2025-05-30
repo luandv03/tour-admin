@@ -11,6 +11,7 @@ import {
 } from "@ant-design/icons";
 import { Breadcrumb, Layout, Menu, theme, Dropdown, Avatar, Space } from "antd";
 const { Header, Content, Footer, Sider } = Layout;
+import { useKeycloak } from "../context/KeycloakContext";
 
 function getItem(label, key, icon, path = "/i", children) {
     return {
@@ -38,6 +39,7 @@ const MainLayout = () => {
         token: { colorBgContainer, borderRadiusLG },
     } = theme.useToken();
     const navigate = useNavigate(); // Hook để điều hướng giữa các trang
+    const { isAuthenticated, logout, userInfo } = useKeycloak();
 
     // Dropdown menu items
     const onMenuClick = (e) => {
@@ -62,7 +64,11 @@ const MainLayout = () => {
             {/* <Menu.Item key="settings" icon={<SettingOutlined />}>
                 Cài đặt
             </Menu.Item> */}
-            <Menu.Item key="logout" icon={<LogoutOutlined />}>
+            <Menu.Item
+                key="logout"
+                icon={<LogoutOutlined />}
+                onClick={() => logout()}
+            >
                 Đăng xuất
             </Menu.Item>
         </Menu>

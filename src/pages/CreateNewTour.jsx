@@ -144,14 +144,19 @@ const CreateNewTour = () => {
     const handlePriceChange = (e) => {
         const { name, value } = e.target;
 
-        setPrices((prev) => {
-            prev.forEach((p) => {
-                if (p.passengerTypeId === name) {
-                    p.price = value;
-                }
-            });
-            return [...prev];
-        });
+        console.log(name, value);
+
+        console.log(prices);
+
+        // The issue is here - we're not properly updating the state
+        // We're mutating objects in the state and then returning the same array reference
+        // React doesn't recognize this as a state change
+
+        setPrices((prev) =>
+            prev.map((p) =>
+                p.passengerTypeId == name ? { ...p, price: value } : p
+            )
+        );
     };
 
     const handleSubmit = async (values) => {
@@ -217,8 +222,6 @@ const CreateNewTour = () => {
         };
 
         console.log(body);
-
-        return;
 
         setLoading(true);
         try {

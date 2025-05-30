@@ -99,7 +99,7 @@ const TourBookingManagement = () => {
                         type="link"
                         icon={<EyeOutlined />}
                         onClick={() =>
-                            navigate(`/tour-booking/${record.tourBookingId}`)
+                            navigate(`/tours-booking/${record.tourBookingId}`)
                         }
                     />
                     <Button

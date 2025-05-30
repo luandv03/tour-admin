@@ -176,3 +176,16 @@ export const confirmCustomerBooking = async (bookingId) => {
         throw error; // Ném lỗi để xử lý ở nơi gọi hàm
     }
 };
+
+export const confirmCustomBooking = async (bookingId, priceData) => {
+    try {
+        const response = await axios.put(
+            `${BASE_URL}/tour-bookings/confirm-custom/${bookingId}`,
+            priceData
+        );
+        return response.data; // Trả về dữ liệu booking sau khi cập nhật giá
+    } catch (error) {
+        console.error("Error updating custom booking prices:", error);
+        throw error; // Ném lỗi để xử lý ở nơi gọi hàm
+    }
+};

@@ -15,50 +15,6 @@ import { EditOutlined } from "@ant-design/icons";
 
 const { Title } = Typography;
 
-const mockData = {
-    tour: {
-        id: "T001",
-        name: "Tour Hà Nội - Hạ Long",
-        prices: [
-            { type: "Người lớn (Từ 12 tuổi trở lên)", price: 2000000 },
-            { type: "Trẻ em (Từ 5 đến 11 tuổi)", price: 1000000 },
-            { type: "Trẻ nhỏ (Từ 2 đến 4 tuổi)", price: 500000 },
-            { type: "Em bé (Dưới 2 tuổi)", price: 0 },
-        ],
-        itinerary: [
-            { id: 1, value: "Vịnh Hạ Long", day: 1 },
-            { id: 2, value: "Chùa Một Cột", day: 2 },
-        ],
-        departurePoint: { id: 1, name: "Hà Nội" },
-        type: "Doanh nghiệp",
-    },
-    customer: {
-        name: "Nguyễn Văn A",
-        email: "nguyenvana@example.com",
-        phone: "0123456789",
-    },
-    booking: {
-        id: "B001",
-        bookingDate: "2025-04-01 12:00:00",
-        status: "Chờ xác nhận",
-        departureDate: "2025-05-01",
-        people: [
-            { type: "Người lớn", count: 2 },
-            { type: "Trẻ em", count: 1 },
-            { type: "Trẻ nhỏ", count: 1 },
-            { type: "Em bé", count: 0 },
-        ],
-        numOfPeople: 4,
-        totalPrice: 5000000,
-        vat: 10,
-        discount: 10,
-        totalPriceAfterDiscount: 4500000,
-        prevPercent: 60,
-        prevPayment: 2700000,
-        prevPaymentDate: "2025-04-01 12:00:00",
-    },
-};
-
 const TourBookingRequestDetail = ({ booking }) => {
     const Booking_Data = booking || {
         tour: {
